@@ -1,0 +1,15 @@
+{
+  "appId": "com.ieces.admin-dashboard-manager",
+  "productName": "IECES Admin Dashboard",
+  "directories": {
+    "output": "release"
+  },
+  "files": ["dist/**/*", "electron/**/*"],
+  "win": {
+    "target": ["nsis"],
+    "icon": "public/idm.ico"
+  },
+  "mac": {
+    "icon": "public/idm.icns"
+  }
+}
