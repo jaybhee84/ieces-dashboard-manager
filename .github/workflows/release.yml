@@ -11,10 +11,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,28 +54,19 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Build Electron app (Windows)
-        if: runner.os == 'Windows'
-        run: npm run electron:build
-
-      - name: Build Electron app (macOS)
-        if: runner.os == 'macOS'
-        run: npm run electron:build
-
-      - name: Build Electron app (Linux)
-        if: runner.os == 'Linux'
+      - name: Build Electron app
         run: npm run electron:build
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: release-windows
           path: release/
           retention-days: 5
 
   create-release:
     needs: release
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -88,8 +76,9 @@ jobs:
       - name: Get version from package.json
         id: package_version
         run: |
-          version=$(jq -r '.version' package.json)
-          echo "version=$version" >> $GITHUB_OUTPUT
+          $version = Get-Content package.json | ConvertFrom-Json | Select-Object -ExpandProperty version
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+        shell: powershell
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
