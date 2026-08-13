@@ -1,7 +1,7 @@
 export default function OnlineUsersPage({ onlineUsers }) {
   return (
     <section className="panel-card">
-      <h2>Online Users</h2>
+      <header><div><p className="eyebrow">Live activity</p><h2>Online Users</h2><p>Monitor active sessions across IECES applications.</p></div><span className="status-pill"><i/> {onlineUsers.length} online</span></header>
       {onlineUsers.length === 0 ? (
         <p>No users are currently online.</p>
       ) : (

@@ -55,14 +55,12 @@ export default function LoginPage({ onSuccess, addToast }) {
         email: loginEmail,
         password,
       });
-
       if (error) {
-        addToast(error.message || "Login failed", "error");
+        addToast(error.message || "Login failed.", "error");
         return;
       }
-
       if (data?.session) {
-        addToast("Login successful", "success");
+        addToast("Logged in to IECES.", "success");
         onSuccess(data.session);
       }
     } catch (error) {
@@ -91,7 +89,7 @@ export default function LoginPage({ onSuccess, addToast }) {
             <p className="login-subtitle">
               {mode === "register"
                 ? "Create a new administrator account"
-                : "Sign in to the administrator dashboard"}
+                : "Your IECES or BMI account will be detected automatically"}
             </p>
           </div>
 

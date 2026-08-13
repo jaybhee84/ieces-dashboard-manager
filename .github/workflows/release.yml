@@ -1,0 +1,110 @@
+name: Auto Tag & Release
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get version from package.json
+        id: package_version
+        run: |
+          $version = Get-Content package.json | ConvertFrom-Json | Select-Object -ExpandProperty version
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+        shell: powershell
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          $tagExists = git rev-parse v${{ steps.package_version.outputs.version }} 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            echo "tag_exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tag_exists=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: powershell
+
+      - name: Create tag
+        if: steps.check_tag.outputs.tag_exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v${{ steps.package_version.outputs.version }} -m "Release v${{ steps.package_version.outputs.version }}"
+          git push origin v${{ steps.package_version.outputs.version }}
+
+      - name: Build project
+        run: npm run build
+
+      - name: Build Electron app (Windows)
+        if: runner.os == 'Windows'
+        run: npm run electron:build
+
+      - name: Build Electron app (macOS)
+        if: runner.os == 'macOS'
+        run: npm run electron:build
+
+      - name: Build Electron app (Linux)
+        if: runner.os == 'Linux'
+        run: npm run electron:build
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: release/
+          retention-days: 5
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from package.json
+        id: package_version
+        run: |
+          version=$(jq -r '.version' package.json)
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') || success()
+        with:
+          tag_name: v${{ steps.package_version.outputs.version }}
+          name: Release v${{ steps.package_version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: artifacts/**/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -12,7 +12,7 @@ export default function UserManagementPage({ users, refreshUsers, addToast }) {
   return (
     <section className="panel-card">
       <header>
-        <h2>User Management</h2>
+        <div><p className="eyebrow">Management</p><h2>User Management</h2><p>Manage access and account recovery for IECES users.</p></div>
         <button onClick={refreshUsers}>Refresh users</button>
       </header>
       {users.length === 0 ? (

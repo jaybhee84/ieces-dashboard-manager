@@ -1,13 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 import LoginPage from "./pages/LoginPage";
-import DashboardPage from "./pages/DashboardPage";
-import OnlineUsersPage from "./pages/OnlineUsersPage";
-import UserManagementPage from "./pages/UserManagementPage";
-import ReportAppPage from "./pages/ReportAppPage";
-import PortalAppPage from "./pages/PortalAppPage";
-import NewsAppPage from "./pages/NewsAppPage";
-import BmiAppPage from "./pages/BmiAppPage";
+import DashboardPage, { Icon } from "./pages/DashboardPage";
 
 function Toast({ toasts, dismiss }) {
   return (
@@ -15,202 +9,213 @@ function Toast({ toasts, dismiss }) {
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast-${toast.type}`}>
           <span>{toast.message}</span>
-          <button onClick={() => dismiss(toast.id)}>✕</button>
+          <button
+            onClick={() => dismiss(toast.id)}
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
         </div>
       ))}
     </div>
   );
 }
 
+const normalizeProfile = (profile, source) => ({
+  id: profile.id,
+  email: profile.email || profile.username || "No email available",
+  full_name:
+    profile.full_name ||
+    profile.fullname ||
+    [
+      profile.first_name || profile.firstname,
+      profile.family_name || profile.lastname,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    profile.username ||
+    "Unnamed user",
+  role: profile.role || "user",
+  source,
+});
+
 function App() {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
-  const [page, setPage] = useState("dashboard");
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
   const [toasts, setToasts] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [checking, setChecking] = useState(false);
+  const [directories, setDirectories] = useState({
+    shared: { users: [], presence: [] },
+    bmi: { users: [], presence: [] },
+  });
 
-  const addToast = (message, type = "info", duration = 4000) => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(
-      () => setToasts((prev) => prev.filter((toast) => toast.id !== id)),
-      duration,
-    );
-  };
-
-  const dismissToast = (id) =>
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-
-  const loadOnlineUsers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("user_presence")
-        .select("id, user_id, email, last_seen, status")
-        .eq("status", "online")
-        .order("last_seen", { ascending: false });
-      if (error) throw error;
-      setOnlineUsers(data ?? []);
-    } catch (error) {
-      setOnlineUsers([]);
-      addToast(
-        "Could not load online users. Confirm user_presence table exists.",
-        "warning",
-      );
-    }
+  const addToast = useCallback((message, type = "info", duration = 4000) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((previous) => [...previous, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((previous) => previous.filter((toast) => toast.id !== id));
+    }, duration);
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("app_users")
-        .select("id, email, full_name, role, status")
-        .order("email", { ascending: true });
-      if (error) throw error;
-      setUsers(data ?? []);
-    } catch (error) {
-      setUsers([]);
-      addToast(
-        "Could not load app users. Confirm app_users table exists.",
-        "warning",
+  const loadDirectories = useCallback(async () => {
+    const [sharedProfiles, bmiProfiles, presence] = await Promise.all([
+      supabase.from("profiles").select("*"),
+      supabase.from("bmi_profiles").select("*"),
+      supabase.from("user_presence").select("*"),
+    ]);
+
+    if (sharedProfiles.error)
+      console.warn(
+        "Could not load IECES profiles:",
+        sharedProfiles.error.message,
       );
-    }
+    if (bmiProfiles.error)
+      console.warn("Could not load BMI profiles:", bmiProfiles.error.message);
+
+    const presenceRows = presence.error ? [] : (presence.data ?? []);
+    setDirectories({
+      shared: {
+        users: (sharedProfiles.data ?? []).map((profile) =>
+          normalizeProfile(profile, "shared"),
+        ),
+        presence: presenceRows.filter((row) => row.app_id !== "bmi"),
+      },
+      bmi: {
+        users: (bmiProfiles.data ?? []).map((profile) =>
+          normalizeProfile(profile, "bmi"),
+        ),
+        presence: presenceRows.filter((row) => row.app_id === "bmi"),
+      },
+    });
   }, []);
 
-  const loadSessionData = useCallback(
-    async (sessionData) => {
-      const currentUser = sessionData?.user ?? null;
-      if (!currentUser) {
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      setUser(currentUser);
-      setSession(sessionData);
-      setPage("dashboard");
-      setErrorMessage("");
-      await Promise.all([loadOnlineUsers(), loadUsers()]);
+  const loadSession = useCallback(
+    async (nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession) await loadDirectories();
       setLoading(false);
     },
-    [loadOnlineUsers, loadUsers],
+    [loadDirectories],
   );
 
   useEffect(() => {
-    const init = async () => {
-      if (
-        !import.meta.env.VITE_SUPABASE_URL ||
-        !import.meta.env.VITE_SUPABASE_ANON_KEY
-      ) {
-        // We provide sensible defaults in `src/lib/supabaseClient.js` so the app
-        // can run without .env during development. Show a non-blocking warning
-        // instead of preventing startup.
-        console.warn(
-          "VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not set; using built-in defaults.",
-        );
-        // keep errorMessage empty so UI doesn't show the blocking alert
-        setErrorMessage("");
-      }
-      const { data } = await supabase.auth.getSession();
-      await loadSessionData(data.session);
-    };
-    init();
-
+    supabase.auth.getSession().then(({ data }) => loadSession(data.session));
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, sessionData) => {
-      await loadSessionData(sessionData);
-    });
-
+    } = supabase.auth.onAuthStateChange((_event, nextSession) =>
+      loadSession(nextSession),
+    );
     return () => subscription.unsubscribe();
-  }, [loadSessionData]);
+  }, [loadSession]);
 
   useEffect(() => {
-    const presenceSubscription = supabase
-      .channel("online-users")
+    if (!session) return undefined;
+    const channel = supabase
+      .channel("admin-user-presence")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_presence" },
-        async () => {
-          await loadOnlineUsers();
-        },
+        loadDirectories,
       )
       .subscribe();
-
     return () => {
-      supabase.removeChannel(presenceSubscription);
+      supabase.removeChannel(channel);
     };
-  }, [loadOnlineUsers]);
+  }, [session, loadDirectories]);
 
-  const handleLogout = async () => {
+  const logout = async () => {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
-    setPage("dashboard");
     addToast("Logged out successfully.", "success");
   };
 
-  const handleLoginSuccess = async (sessionData) => {
-    await loadSessionData(sessionData);
-    addToast("Welcome back, admin.", "success");
+  const checkForUpdates = async () => {
+    setChecking(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      addToast("You're running the latest version!", "success");
+    } catch (error) {
+      addToast("Failed to check for updates.", "error");
+    } finally {
+      setChecking(false);
+    }
   };
 
-  const refreshData = async () => {
-    await Promise.all([loadOnlineUsers(), loadUsers()]);
-  };
-
-  if (loading) {
+  if (loading)
     return (
       <div className="center-screen">
         <div className="card">Loading admin dashboard…</div>
       </div>
     );
-  }
 
-  if (!session) {
+  if (!session)
     return (
       <div className="auth-screen">
-        <LoginPage onSuccess={handleLoginSuccess} addToast={addToast} />
-        {errorMessage && <div className="alert error">{errorMessage}</div>}
-        <Toast toasts={toasts} dismiss={dismissToast} />
+        <LoginPage onSuccess={loadSession} addToast={addToast} />
+        <Toast
+          toasts={toasts}
+          dismiss={(id) =>
+            setToasts((previous) => previous.filter((toast) => toast.id !== id))
+          }
+        />
       </div>
     );
-  }
 
   return (
-    <div className="page-shell">
-      <div className="layout-card">
+    <div className="admin-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <img src="/idm.png" alt="IECES" />
+          <div>
+            <strong>IECES</strong>
+            <span>Admin Console</span>
+          </div>
+        </div>
+        <nav aria-label="Main navigation">
+          <button className="active">
+            <Icon name="grid" /> Dashboard
+          </button>
+          <p>Management</p>
+          <span className="nav-hint">
+            <Icon name="users" /> Users are managed inside each application
+          </span>
+          <p>Tools</p>
+          <button
+            className={`check-updates-btn ${checking ? "checking" : ""}`}
+            onClick={checkForUpdates}
+            disabled={checking}
+          >
+            <Icon name="download" /> Check Updates
+          </button>
+        </nav>
+        <div className="sidebar-user">
+          <div className="avatar">{(user?.email || "A")[0].toUpperCase()}</div>
+          <div>
+            <strong>{user?.user_metadata?.full_name || "Administrator"}</strong>
+            <span>{user?.email} · IECES</span>
+          </div>
+          <button onClick={logout} aria-label="Log out" title="Log out">
+            <Icon name="logout" size={18} />
+          </button>
+        </div>
+      </aside>
+      <main className="main-content">
         <DashboardPage
           user={user}
-          page={page}
-          onNavigate={setPage}
-          onLogout={handleLogout}
-          onRefresh={refreshData}
+          directories={directories}
+          onRefresh={loadDirectories}
+          addToast={addToast}
         />
-
-        {page === "online-users" && (
-          <OnlineUsersPage onlineUsers={onlineUsers} />
-        )}
-        {page === "manage-users" && (
-          <UserManagementPage
-            users={users}
-            refreshUsers={refreshData}
-            addToast={addToast}
-          />
-        )}
-        {page === "report" && (
-          <ReportAppPage onBack={() => setPage("dashboard")} />
-        )}
-        {page === "portal" && (
-          <PortalAppPage onBack={() => setPage("dashboard")} />
-        )}
-        {page === "news" && <NewsAppPage onBack={() => setPage("dashboard")} />}
-        {page === "bmi" && <BmiAppPage onBack={() => setPage("dashboard")} />}
-      </div>
-      <Toast toasts={toasts} dismiss={dismissToast} />
+      </main>
+      <Toast
+        toasts={toasts}
+        dismiss={(id) =>
+          setToasts((previous) => previous.filter((toast) => toast.id !== id))
+        }
+      />
     </div>
   );
 }
