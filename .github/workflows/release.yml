@@ -7,11 +7,14 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
     runs-on: windows-latest
+    outputs:
+      tag_created: ${{ steps.check_tag.outputs.tag_created }}
+      version: ${{ steps.package_version.outputs.version }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,65 +38,63 @@ jobs:
       - name: Check if tag exists
         id: check_tag
         run: |
-          $tagExists = git rev-parse v${{ steps.package_version.outputs.version }} 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            echo "tag_exists=true" >> $env:GITHUB_OUTPUT
+          git fetch --tags
+          $tagExists = git tag -l "v${{ steps.package_version.outputs.version }}"
+          if ($tagExists) {
+            echo "tag_created=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Tag v${{ steps.package_version.outputs.version }} already exists — skipping release."
           } else {
-            echo "tag_exists=false" >> $env:GITHUB_OUTPUT
+            echo "tag_created=true" >> $env:GITHUB_OUTPUT
           }
         shell: powershell
 
-      - name: Create tag
-        if: steps.check_tag.outputs.tag_exists == 'false'
+      - name: Create and push tag
+        if: steps.check_tag.outputs.tag_created == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a v${{ steps.package_version.outputs.version }} -m "Release v${{ steps.package_version.outputs.version }}"
           git push origin v${{ steps.package_version.outputs.version }}
 
-      - name: Build project
-        run: npm run build
+      - name: Build Vite + Electron app
+        if: steps.check_tag.outputs.tag_created == 'true'
+        run: npx vite build && npx electron-builder --win --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Electron app
-        run: npm run electron:build
-
-      - name: Upload release artifacts
+      - name: Upload installer artifacts
+        if: steps.check_tag.outputs.tag_created == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-windows
-          path: release/
+          path: |
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
           retention-days: 5
 
   create-release:
     needs: release
-    runs-on: windows-latest
-    if: always()
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.tag_created == 'true'
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Get version from package.json
-        id: package_version
-        run: |
-          $version = Get-Content package.json | ConvertFrom-Json | Select-Object -ExpandProperty version
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-        shell: powershell
-
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          name: release-windows
           path: artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') || success()
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.package_version.outputs.version }}
-          name: Release v${{ steps.package_version.outputs.version }}
+          tag_name: v${{ needs.release.outputs.version }}
+          name: Release v${{ needs.release.outputs.version }}
           draft: false
           prerelease: false
-          files: artifacts/**/*
           generate_release_notes: true
+          files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
