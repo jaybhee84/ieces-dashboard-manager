@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage, { Icon } from "./pages/DashboardPage";
+import logo from "./image/idm.png";
 
 function Toast({ toasts, dismiss }) {
   return (
@@ -168,7 +169,7 @@ function App() {
     <div className="admin-shell">
       <aside className="sidebar">
         <div className="brand">
-          <img src="/idm.png" alt="IECES" />
+          <img src={logo} alt="IECES" />
           <div>
             <strong>IECES</strong>
             <span>Admin Console</span>
