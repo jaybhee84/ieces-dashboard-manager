@@ -4,6 +4,14 @@
   "directories": {
     "output": "release"
   },
+  "artifactName": "IECES-Admin-Dashboard-Setup-${version}.${ext}",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "jaybhee84",
+      "repo": "ieces-dashboard-manager"
+    }
+  ],
   "files": ["dist/**/*", "electron/**/*"],
   "win": {
     "target": ["nsis"],

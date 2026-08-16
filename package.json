@@ -1,7 +1,7 @@
 {
   "name": "ieces-admin-dashboard-manager",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -15,6 +15,7 @@
   "author": "Jay Bhee",
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",
+    "electron-updater": "^6.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "wait-on": "^9.1.0"

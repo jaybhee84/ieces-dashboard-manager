@@ -126,6 +126,19 @@ function App() {
     };
   }, [session, loadDirectories]);
 
+  useEffect(() => {
+    if (!window.electron?.onUpdateStatus) return undefined;
+    return window.electron.onUpdateStatus(({ status, message }) => {
+      const type = status === "error" ? "error" : "info";
+      addToast(message, type);
+      setChecking(
+        status === "checking" ||
+          status === "available" ||
+          status === "downloading",
+      );
+    });
+  }, [addToast]);
+
   const logout = async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -136,11 +149,12 @@ function App() {
   const checkForUpdates = async () => {
     setChecking(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      addToast("You're running the latest version!", "success");
+      if (!window.electron?.checkForUpdates) {
+        throw new Error("Update checks are only available in the installed app.");
+      }
+      await window.electron.checkForUpdates();
     } catch (error) {
-      addToast("Failed to check for updates.", "error");
-    } finally {
+      addToast(error.message || "Failed to check for updates.", "error");
       setChecking(false);
     }
   };
