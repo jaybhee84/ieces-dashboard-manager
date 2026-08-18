@@ -3,12 +3,20 @@ import { supabase, dashboardRegister } from "../lib/supabaseClient";
 import logo from "../image/idm.png";
 import "./LoginPage.css";
 
+// ── Default admin shortcut ────────────────────────────────────────────────────
+// Typing "admin" / "Zeejay1984" maps to the actual Supabase account below.
+const DEFAULT_ADMIN_USERNAME = "admin";
+const DEFAULT_ADMIN_PASSWORD = "Zeejay1984";
+const DEFAULT_ADMIN_EMAIL    = "ieces2024@gmail.com";
+const DEFAULT_ADMIN_PASS     = "admin123";
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function LoginPage({ onSuccess, addToast }) {
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const [identifier, setIdentifier]   = useState("");
+  const [password, setPassword]       = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [mode, setMode] = useState("login");
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode]               = useState("login");
+  const [loading, setLoading]         = useState(false);
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -17,6 +25,7 @@ export default function LoginPage({ onSuccess, addToast }) {
     setLoading(true);
 
     try {
+      // ── Register ────────────────────────────────────────────────────────────
       if (mode === "register") {
         const email = identifier.trim().toLowerCase();
 
@@ -29,8 +38,6 @@ export default function LoginPage({ onSuccess, addToast }) {
           return;
         }
 
-        // Use edge function — handles whitelist check + per-app profile
-        // creation without throwing "email already exists" for shared emails.
         const result = await dashboardRegister({
           email,
           password,
@@ -42,10 +49,7 @@ export default function LoginPage({ onSuccess, addToast }) {
           return;
         }
 
-        addToast(
-          "Registration successful! You can now log in.",
-          "success",
-        );
+        addToast("Registration successful! You can now log in.", "success");
         setMode("login");
         setIdentifier("");
         setPassword("");
@@ -53,19 +57,30 @@ export default function LoginPage({ onSuccess, addToast }) {
         return;
       }
 
-      // ── Login ──────────────────────────────────────────────────────────────
-      const loginEmail = identifier.includes("@")
-        ? identifier
-        : `${identifier}@ieces.ph`;
+      // ── Login ───────────────────────────────────────────────────────────────
+      const trimmedId = identifier.trim();
+      const isAdminShortcut =
+        trimmedId.toLowerCase() === DEFAULT_ADMIN_USERNAME &&
+        password === DEFAULT_ADMIN_PASSWORD;
+
+      const loginEmail = isAdminShortcut
+        ? DEFAULT_ADMIN_EMAIL
+        : trimmedId.includes("@")
+        ? trimmedId
+        : `${trimmedId}@ieces.ph`;
+
+      const loginPassword = isAdminShortcut ? DEFAULT_ADMIN_PASS : password;
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
-        password,
+        password: loginPassword,
       });
+
       if (error) {
         addToast(error.message || "Login failed.", "error");
         return;
       }
+
       if (data?.session) {
         addToast("Logged in to IECES.", "success");
         onSuccess(data.session);
@@ -156,8 +171,8 @@ export default function LoginPage({ onSuccess, addToast }) {
                     ? "Registering…"
                     : "Logging in…"
                   : mode === "register"
-                    ? "Register"
-                    : "Login"}
+                  ? "Register"
+                  : "Login"}
               </button>
             </div>
           </form>

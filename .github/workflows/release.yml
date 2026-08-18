@@ -11,9 +11,6 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-    outputs:
-      tag_created: ${{ steps.check_tag.outputs.tag_created }}
-      version: ${{ steps.package_version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -65,33 +62,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload installer artifacts
-        if: steps.check_tag.outputs.tag_created == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-windows
-          path: release/
-          retention-days: 5
-
-  create-release:
-    needs: release
-    runs-on: windows-latest
-    if: needs.release.outputs.tag_created == 'true'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-windows
-          path: release
-
       - name: Create GitHub Release
+        if: steps.check_tag.outputs.tag_created == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.release.outputs.version }}
-          name: Release v${{ needs.release.outputs.version }}
+          tag_name: v${{ steps.package_version.outputs.version }}
+          name: Release v${{ steps.package_version.outputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true
