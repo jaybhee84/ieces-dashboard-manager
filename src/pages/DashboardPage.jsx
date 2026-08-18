@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useState, useEffect, useCallback } from "react";
+import {
+  supabase,
+  dashboardDeleteUser,
+  getAppAllowedEmails,
+  addAppAllowedEmail,
+  removeAppAllowedEmail,
+} from "../lib/supabaseClient";
 import reportLogo from "../image/app-logos/ieces-report.png";
 import portalLogo from "../image/app-logos/ieces-portal.png";
 import newsLogo from "../image/app-logos/ieces-media-manager.png";
@@ -35,41 +41,31 @@ const Icon = ({ name, size = 20 }) => {
         <path d="m16 17 5-5-5-5M21 12H9" />
       </>
     ),
-    arrow: (
-      <>
-        <path d="M5 12h14M13 6l6 6-6 6" />
-      </>
-    ),
-    report: (
-      <>
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <path d="M14 2v6h6M8 13h8M8 17h6" />
-      </>
-    ),
-    portal: (
-      <>
-        <rect x="3" y="3" width="18" height="18" rx="3" />
-        <path d="M3 9h18M9 21V9" />
-      </>
-    ),
-    news: (
-      <>
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        <path d="M8 7h8M8 11h6" />
-      </>
-    ),
-    bmi: (
-      <>
-        <path d="M12 21s-8-4.5-8-11a5 5 0 0 1 8-4 5 5 0 0 1 8 4c0 6.5-8 11-8 11z" />
-        <path d="M8 12h2l1-3 2 6 1-3h2" />
-      </>
-    ),
+    arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
     download: (
       <>
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </>
+    ),
+    plus: (
+      <>
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </>
+    ),
+    trash: (
+      <>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4h6v2" />
       </>
     ),
   };
@@ -130,6 +126,130 @@ export const apps = [
 ];
 export { Icon };
 
+// ── Allowed Emails Tab ────────────────────────────────────────────────────────
+function AppAllowedEmails({ app, currentUserEmail, addToast }) {
+  const [emails, setEmails] = useState([]);
+  const [newEmail, setNewEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+
+  const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await getAppAllowedEmails(app.key);
+    if (error)
+      addToast(`Failed to load allowed emails for ${app.title}.`, "error");
+    else setEmails(data);
+    setLoading(false);
+  }, [app.key, app.title, addToast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const email = newEmail.trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      addToast("Enter a valid email address.", "error");
+      return;
+    }
+    if (emails.some((r) => r.email === email)) {
+      addToast("That email is already in the list.", "warning");
+      return;
+    }
+    setAdding(true);
+    const error = await addAppAllowedEmail(app.key, email, currentUserEmail);
+    setAdding(false);
+    if (error) {
+      addToast(error.message || "Failed to add email.", "error");
+    } else {
+      addToast(`${email} added to ${app.title} allowed list.`, "success");
+      setNewEmail("");
+      await load();
+    }
+  };
+
+  const handleRemove = async (id, email) => {
+    setRemovingId(id);
+    const error = await removeAppAllowedEmail(app.key, id);
+    setRemovingId(null);
+    if (error) {
+      addToast(error.message || "Failed to remove email.", "error");
+    } else {
+      addToast(`${email} removed from ${app.title} allowed list.`, "success");
+      setEmails((prev) => prev.filter((r) => r.id !== id));
+    }
+  };
+
+  return (
+    <div className="card-user-directory">
+      <div className="directory-heading">
+        <div>
+          <strong>Allowed Emails</strong>
+          <span>
+            Only these emails can register in {app.title}. {emails.length} email
+            {emails.length !== 1 ? "s" : ""} whitelisted.
+          </span>
+        </div>
+      </div>
+
+      {/* Add form */}
+      <form className="allowed-emails-form" onSubmit={handleAdd}>
+        <input
+          type="email"
+          placeholder="email@example.com"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          required
+        />
+        <button type="submit" className="add-btn" disabled={adding}>
+          {adding ? (
+            "Adding…"
+          ) : (
+            <>
+              <Icon name="plus" size={14} /> Add email
+            </>
+          )}
+        </button>
+      </form>
+
+      {loading ? (
+        <p className="directory-empty">Loading…</p>
+      ) : emails.length === 0 ? (
+        <p className="directory-empty">
+          No emails whitelisted yet. Add one above to allow registration.
+        </p>
+      ) : (
+        <div className="user-list">
+          {emails.map((row) => (
+            <div className="allowed-email-row" key={row.id}>
+              <div className="user-identity">
+                <strong>{row.email}</strong>
+                <span>
+                  Added by {row.added_by || "—"} ·{" "}
+                  {new Date(row.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <button
+                className="icon-btn"
+                disabled={removingId === row.id}
+                onClick={() => handleRemove(row.id, row.email)}
+                title="Remove from whitelist"
+              >
+                {removingId === row.id ? "…" : <Icon name="trash" size={14} />}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── User Directory Tab ────────────────────────────────────────────────────────
 function UserDirectory({ app, directory, addToast, onRefresh }) {
   const [resetting, setResetting] = useState("");
   const [deleting, setDeleting] = useState("");
@@ -162,19 +282,16 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
     if (!confirmed) return;
 
     setDeleting(profile.id);
-    const { data, error } = await supabase.functions.invoke("delete-user", {
-      body: { userId: profile.id },
-    });
+    const result = await dashboardDeleteUser(profile.id);
     setDeleting("");
-    if (error || data?.error) {
-      addToast(
-        data?.error || error?.message || "Could not delete the account.",
-        "error",
-      );
+    if (result?.error) {
+      addToast(result.error || "Could not delete the account.", "error");
       return;
     }
     addToast(
-      `${profile.full_name}'s account was permanently deleted.`,
+      result?.auth_deleted
+        ? `${profile.full_name}'s account was permanently deleted.`
+        : `${profile.full_name}'s profile removed (auth kept — used by another app).`,
       "success",
     );
     await onRefresh();
@@ -248,6 +365,70 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
   );
 }
 
+// ── App Management View (tabbed) ──────────────────────────────────────────────
+function AppManagementView({
+  app,
+  directory,
+  addToast,
+  onRefresh,
+  currentUserEmail,
+}) {
+  const [tab, setTab] = useState("users");
+
+  return (
+    <section className="app-management-view">
+      <div className="management-toolbar">
+        {/* tabs */}
+        <div style={{ display: "flex", gap: "0.25rem" }}>
+          <button
+            className={tab === "users" ? "tab-btn active" : "tab-btn"}
+            onClick={() => setTab("users")}
+          >
+            <Icon name="users" size={15} /> Registered Users
+          </button>
+          <button
+            className={tab === "allowed" ? "tab-btn active" : "tab-btn"}
+            onClick={() => setTab("allowed")}
+          >
+            <Icon name="shield" size={15} /> Allowed Emails
+          </button>
+        </div>
+      </div>
+
+      <div className="management-title">
+        <span className={`app-logo ${app.tone}`}>
+          <img src={app.logo} alt={`${app.title} logo`} />
+        </span>
+        <div>
+          <span className="app-category">{app.category}</span>
+          <h2>{app.title}</h2>
+          <p>
+            {tab === "users"
+              ? "Registered accounts, current activity, password recovery, and account removal."
+              : "Control which emails are allowed to register in this application."}
+          </p>
+        </div>
+      </div>
+
+      {tab === "users" ? (
+        <UserDirectory
+          app={app}
+          directory={directory}
+          addToast={addToast}
+          onRefresh={onRefresh}
+        />
+      ) : (
+        <AppAllowedEmails
+          app={app}
+          currentUserEmail={currentUserEmail}
+          addToast={addToast}
+        />
+      )}
+    </section>
+  );
+}
+
+// ── Main DashboardPage ────────────────────────────────────────────────────────
 export default function DashboardPage({
   user,
   directories,
@@ -263,9 +444,9 @@ export default function DashboardPage({
   const bmiDirectory = directories?.bmi || { users: [], presence: [] };
   const userCount = sharedDirectory.users.length + bmiDirectory.users.length;
   const onlineCount =
-    sharedDirectory.presence.filter((entry) => entry.status === "online")
-      .length +
-    bmiDirectory.presence.filter((entry) => entry.status === "online").length;
+    sharedDirectory.presence.filter((e) => e.status === "online").length +
+    bmiDirectory.presence.filter((e) => e.status === "online").length;
+
   return (
     <div className="dashboard-view">
       <header className="view-header">
@@ -273,13 +454,14 @@ export default function DashboardPage({
           <p className="eyebrow">Overview</p>
           <h1>Welcome back, {firstName}</h1>
           <p className="view-subtitle">
-            Here’s what’s happening across your IECES applications today.
+            Here's what's happening across your IECES applications today.
           </p>
         </div>
         <button className="button button-secondary" onClick={onRefresh}>
           <Icon name="refresh" size={17} /> Refresh data
         </button>
       </header>
+
       <section className="stats-grid" aria-label="Dashboard summary">
         <article className="stat-card">
           <span className="stat-icon blue">
@@ -312,12 +494,15 @@ export default function DashboardPage({
           </div>
         </article>
       </section>
+
       {!selectedApp ? (
         <section>
           <div className="section-heading">
             <div>
               <h2>Applications</h2>
-              <p>Select an application to view and manage its users.</p>
+              <p>
+                Select an application to manage its users and allowed emails.
+              </p>
             </div>
             <span className="section-count">4 applications</span>
           </div>
@@ -329,9 +514,8 @@ export default function DashboardPage({
                 role="button"
                 tabIndex="0"
                 onClick={() => setSelectedApp(app)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ")
-                    setSelectedApp(app);
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setSelectedApp(app);
                 }}
               >
                 <div className="app-card-top">
@@ -348,45 +532,32 @@ export default function DashboardPage({
                   <p>{app.description}</p>
                 </div>
                 <span className="app-link">
-                  Manage users <Icon name="arrow" size={17} />
+                  Manage <Icon name="arrow" size={17} />
                 </span>
               </article>
             ))}
           </div>
         </section>
       ) : (
-        <section className="app-management-view">
-          <div className="management-toolbar">
-            <button
-              className="back-button"
-              onClick={() => setSelectedApp(null)}
-              aria-label="Back to applications"
-            >
-              <span aria-hidden="true">←</span> Back to applications
-            </button>
-          </div>
-          <div className="management-title">
-            <span className={`app-logo ${selectedApp.tone}`}>
-              <img src={selectedApp.logo} alt={`${selectedApp.title} logo`} />
-            </span>
-            <div>
-              <span className="app-category">{selectedApp.category}</span>
-              <h2>{selectedApp.title}</h2>
-              <p>
-                Registered accounts, current activity, password recovery, and
-                account removal.
-              </p>
-            </div>
-          </div>
-          <UserDirectory
+        <>
+          <button
+            className="back-button"
+            onClick={() => setSelectedApp(null)}
+            aria-label="Back to applications"
+            style={{ marginBottom: "1rem" }}
+          >
+            <span aria-hidden="true">←</span> Back to applications
+          </button>
+          <AppManagementView
             app={selectedApp}
             directory={
               selectedApp.key === "bmi" ? bmiDirectory : sharedDirectory
             }
             addToast={addToast}
             onRefresh={onRefresh}
+            currentUserEmail={user?.email}
           />
-        </section>
+        </>
       )}
     </div>
   );

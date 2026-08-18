@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage, { Icon } from "./pages/DashboardPage";
+import AllowedEmailsPage from "./pages/AllowedEmailsPage";
 import logo from "./image/idm.png";
 
 function Toast({ toasts, dismiss }) {
@@ -40,12 +41,19 @@ const normalizeProfile = (profile, source) => ({
   source,
 });
 
+// ── Pages ────────────────────────────────────────────────────────────────────
+const PAGES = {
+  dashboard: "dashboard",
+  allowedEmails: "allowedEmails",
+};
+
 function App() {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
   const [checking, setChecking] = useState(false);
+  const [activePage, setActivePage] = useState(PAGES.dashboard);
   const [directories, setDirectories] = useState({
     shared: { users: [], presence: [] },
     bmi: { users: [], presence: [] },
@@ -67,10 +75,7 @@ function App() {
     ]);
 
     if (sharedProfiles.error)
-      console.warn(
-        "Could not load IECES profiles:",
-        sharedProfiles.error.message,
-      );
+      console.warn("Could not load IECES profiles:", sharedProfiles.error.message);
     if (bmiProfiles.error)
       console.warn("Could not load BMI profiles:", bmiProfiles.error.message);
 
@@ -121,9 +126,7 @@ function App() {
         loadDirectories,
       )
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [session, loadDirectories]);
 
   useEffect(() => {
@@ -159,6 +162,9 @@ function App() {
     }
   };
 
+  const dismissToast = (id) =>
+    setToasts((previous) => previous.filter((toast) => toast.id !== id));
+
   if (loading)
     return (
       <div className="center-screen">
@@ -170,12 +176,7 @@ function App() {
     return (
       <div className="auth-screen">
         <LoginPage onSuccess={loadSession} addToast={addToast} />
-        <Toast
-          toasts={toasts}
-          dismiss={(id) =>
-            setToasts((previous) => previous.filter((toast) => toast.id !== id))
-          }
-        />
+        <Toast toasts={toasts} dismiss={dismissToast} />
       </div>
     );
 
@@ -190,13 +191,19 @@ function App() {
           </div>
         </div>
         <nav aria-label="Main navigation">
-          <button className="active">
+          <button
+            className={activePage === PAGES.dashboard ? "active" : ""}
+            onClick={() => setActivePage(PAGES.dashboard)}
+          >
             <Icon name="grid" /> Dashboard
           </button>
-          <p>Management</p>
-          <span className="nav-hint">
-            <Icon name="users" /> Users are managed inside each application
-          </span>
+          <p>Access Control</p>
+          <button
+            className={activePage === PAGES.allowedEmails ? "active" : ""}
+            onClick={() => setActivePage(PAGES.allowedEmails)}
+          >
+            <Icon name="users" /> Allowed Emails
+          </button>
           <p>Tools</p>
           <button
             className={`check-updates-btn ${checking ? "checking" : ""}`}
@@ -218,19 +225,22 @@ function App() {
         </div>
       </aside>
       <main className="main-content">
-        <DashboardPage
-          user={user}
-          directories={directories}
-          onRefresh={loadDirectories}
-          addToast={addToast}
-        />
+        {activePage === PAGES.dashboard && (
+          <DashboardPage
+            user={user}
+            directories={directories}
+            onRefresh={loadDirectories}
+            addToast={addToast}
+          />
+        )}
+        {activePage === PAGES.allowedEmails && (
+          <AllowedEmailsPage
+            currentUserEmail={user?.email}
+            addToast={addToast}
+          />
+        )}
       </main>
-      <Toast
-        toasts={toasts}
-        dismiss={(id) =>
-          setToasts((previous) => previous.filter((toast) => toast.id !== id))
-        }
-      />
+      <Toast toasts={toasts} dismiss={dismissToast} />
     </div>
   );
 }

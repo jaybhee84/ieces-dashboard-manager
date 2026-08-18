@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, dashboardRegister } from "../lib/supabaseClient";
 import logo from "../image/idm.png";
 import "./LoginPage.css";
 
 export default function LoginPage({ onSuccess, addToast }) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
 
@@ -23,30 +24,36 @@ export default function LoginPage({ onSuccess, addToast }) {
           addToast("Enter a valid email address.", "error");
           return;
         }
-
         if (password.length < 6) {
           addToast("Password must be at least 6 characters.", "error");
           return;
         }
 
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // Use edge function — handles whitelist check + per-app profile
+        // creation without throwing "email already exists" for shared emails.
+        const result = await dashboardRegister({
+          email,
+          password,
+          display_name: displayName.trim() || email,
+        });
 
-        if (error) {
-          console.error("Supabase sign-up error:", error);
-          addToast(error.message || "Registration failed", "error");
+        if (result.error) {
+          addToast(result.error, "error");
           return;
         }
 
         addToast(
-          "Registration successful. Check your email to confirm your account.",
+          "Registration successful! You can now log in.",
           "success",
         );
         setMode("login");
         setIdentifier("");
         setPassword("");
+        setDisplayName("");
         return;
       }
 
+      // ── Login ──────────────────────────────────────────────────────────────
       const loginEmail = identifier.includes("@")
         ? identifier
         : `${identifier}@ieces.ph`;
@@ -63,11 +70,18 @@ export default function LoginPage({ onSuccess, addToast }) {
         addToast("Logged in to IECES.", "success");
         onSuccess(data.session);
       }
-    } catch (error) {
-      addToast("Unexpected login error", "error");
+    } catch {
+      addToast("Unexpected error. Please try again.", "error");
     } finally {
       setLoading(false);
     }
+  };
+
+  const switchTo = (next) => {
+    setMode(next);
+    setIdentifier("");
+    setPassword("");
+    setDisplayName("");
   };
 
   return (
@@ -88,7 +102,7 @@ export default function LoginPage({ onSuccess, addToast }) {
             </h1>
             <p className="login-subtitle">
               {mode === "register"
-                ? "Create a new administrator account"
+                ? "Your email must be pre-approved by the administrator"
                 : "Your IECES or BMI account will be detected automatically"}
             </p>
           </div>
@@ -105,10 +119,23 @@ export default function LoginPage({ onSuccess, addToast }) {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={
-                  mode === "register" ? "Enter email" : "username here"
+                  mode === "register" ? "Enter your email" : "username here"
                 }
               />
             </div>
+
+            {mode === "register" && (
+              <div className="input-group">
+                <label htmlFor="display_name">Display name</label>
+                <input
+                  id="display_name"
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Your full name (optional)"
+                />
+              </div>
+            )}
 
             <div className="input-group">
               <label htmlFor="password">Password</label>
@@ -142,11 +169,7 @@ export default function LoginPage({ onSuccess, addToast }) {
                 <button
                   type="button"
                   className="auth-toggle"
-                  onClick={() => {
-                    setMode("register");
-                    setIdentifier("");
-                    setPassword("");
-                  }}
+                  onClick={() => switchTo("register")}
                 >
                   Create account
                 </button>
@@ -155,11 +178,7 @@ export default function LoginPage({ onSuccess, addToast }) {
               <button
                 type="button"
                 className="auth-toggle"
-                onClick={() => {
-                  setMode("login");
-                  setIdentifier("");
-                  setPassword("");
-                }}
+                onClick={() => switchTo("login")}
               >
                 ← Back to login
               </button>
