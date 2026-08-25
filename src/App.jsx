@@ -10,7 +10,21 @@ function Toast({ toasts, dismiss }) {
     <div className="toast-container">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast-${toast.type}`}>
-          <span>{toast.message}</span>
+          <div className="toast-content">
+            <span>{toast.message}</span>
+            {typeof toast.progress === "number" ? (
+              <div
+                className="update-progress"
+                role="progressbar"
+                aria-label="Update download progress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={toast.progress}
+              >
+                <span style={{ width: `${toast.progress}%` }} />
+              </div>
+            ) : null}
+          </div>
           <button
             onClick={() => dismiss(toast.id)}
             aria-label="Dismiss notification"
@@ -158,16 +172,38 @@ function App() {
 
   useEffect(() => {
     if (!window.electron?.onUpdateStatus) return undefined;
-    return window.electron.onUpdateStatus(({ status, message }) => {
+    return window.electron.onUpdateStatus(({ status, message, progress }) => {
       const type = status === "error" ? "error" : "info";
-      addToast(message, type);
+      const updateToast = {
+        id: "app-update",
+        message,
+        type,
+        progress: status === "downloading" ? (progress ?? 0) : null,
+      };
+      setToasts((previous) => [
+        ...previous.filter((toast) => toast.id !== updateToast.id),
+        updateToast,
+      ]);
+
+      if (
+        status === "downloaded" ||
+        status === "not-available" ||
+        status === "development" ||
+        status === "error"
+      ) {
+        setTimeout(() => {
+          setToasts((previous) =>
+            previous.filter((toast) => toast.id !== updateToast.id),
+          );
+        }, 6000);
+      }
       setChecking(
         status === "checking" ||
           status === "available" ||
           status === "downloading",
       );
     });
-  }, [addToast]);
+  }, []);
 
   const logout = async () => {
     await supabase.auth.signOut();

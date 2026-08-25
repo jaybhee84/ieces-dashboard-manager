@@ -14,9 +14,9 @@ let updateCheckInProgress = false
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
-function sendUpdateStatus(status, message) {
+function sendUpdateStatus(status, message, progress = null) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update-status', { status, message })
+    mainWindow.webContents.send('update-status', { status, message, progress })
   }
 }
 
@@ -97,7 +97,8 @@ autoUpdater.on('update-not-available', async () => {
 })
 
 autoUpdater.on('download-progress', ({ percent }) => {
-  sendUpdateStatus('downloading', `Downloading update: ${Math.round(percent)}%`)
+  const progress = Math.max(0, Math.min(100, Math.round(percent)))
+  sendUpdateStatus('downloading', `Downloading update: ${progress}%`, progress)
 })
 
 autoUpdater.on('update-downloaded', async (info) => {
