@@ -137,6 +137,10 @@ export const apps = [
 ];
 export { Icon };
 
+const isOnlinePresence = (entry) =>
+  entry.status === "online" &&
+  (!entry.last_seen || Date.now() - new Date(entry.last_seen).getTime() < 120000);
+
 // ── Allowed Emails Tab ────────────────────────────────────────────────────────
 function AppAllowedEmails({ app, currentUserEmail, addToast }) {
   const [emails, setEmails] = useState([]);
@@ -264,9 +268,36 @@ function AppAllowedEmails({ app, currentUserEmail, addToast }) {
 function UserDirectory({ app, directory, addToast, onRefresh }) {
   const [resetting, setResetting] = useState("");
   const [deleting, setDeleting] = useState("");
+  const [allowedEmails, setAllowedEmails] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    getAppAllowedEmails(app.key).then(({ data, error }) => {
+      if (!active) return;
+      if (error) addToast(`Failed to load allowed emails for ${app.title}.`, "error");
+      else setAllowedEmails(data);
+    });
+    return () => { active = false; };
+  }, [app.key, app.title, addToast]);
+
+  const registeredEmails = new Set(
+    directory.users.map((profile) => profile.email?.trim().toLowerCase()),
+  );
+  const users = [
+    ...directory.users.map((profile) => ({ ...profile, isRegistered: true })),
+    ...allowedEmails
+      .filter((row) => row.email && !registeredEmails.has(row.email.trim().toLowerCase()))
+      .map((row) => ({
+        id: `allowed-${row.id}`,
+        email: row.email,
+        full_name: row.email.split("@")[0],
+        role: "Allowed (not registered)",
+        isRegistered: false,
+      })),
+  ];
   const onlineIds = new Set(
     directory.presence
-      .filter((entry) => entry.status === "online")
+      .filter(isOnlinePresence)
       .flatMap((entry) =>
         [entry.user_id, entry.id, entry.email].filter(Boolean),
       ),
@@ -314,26 +345,25 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
         <div>
           <strong>Registered users</strong>
           <span>
-            {directory.users.length} account
-            {directory.users.length === 1 ? "" : "s"}
+            {users.length} user{users.length === 1 ? "" : "s"}
           </span>
         </div>
         <span className="online-summary">
           <i />
           {
-            directory.presence.filter((entry) => entry.status === "online")
+            directory.presence.filter(isOnlinePresence)
               .length
           }{" "}
           online
         </span>
       </div>
-      {directory.users.length === 0 ? (
+      {users.length === 0 ? (
         <p className="directory-empty">
           No readable user profiles were found for this app.
         </p>
       ) : (
         <div className="user-list">
-          {directory.users.map((profile) => {
+          {users.map((profile) => {
             const isOnline =
               onlineIds.has(profile.id) || onlineIds.has(profile.email);
             return (
@@ -347,7 +377,7 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   <span>{profile.email}</span>
                 </div>
                 <span className="user-role">{profile.role}</span>
-                <div className="user-actions">
+                {profile.isRegistered ? <div className="user-actions">
                   <button
                     className="reset-link"
                     disabled={
@@ -366,7 +396,7 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   >
                     {deleting === profile.id ? "Deleting…" : "Delete account"}
                   </button>
-                </div>
+                </div> : null}
               </div>
             );
           })}
@@ -451,12 +481,16 @@ export default function DashboardPage({
     user?.user_metadata?.full_name?.split(" ")[0] ||
     user?.email?.split("@")[0] ||
     "Admin";
-  const sharedDirectory = directories?.shared || { users: [], presence: [] };
+  const reportDirectory = directories?.report || { users: [], presence: [] };
+  const portalDirectory = directories?.portal || { users: [], presence: [] };
+  const newsDirectory = directories?.news || { users: [], presence: [] };
   const bmiDirectory = directories?.bmi || { users: [], presence: [] };
-  const userCount = sharedDirectory.users.length + bmiDirectory.users.length;
-  const onlineCount =
-    sharedDirectory.presence.filter((e) => e.status === "online").length +
-    bmiDirectory.presence.filter((e) => e.status === "online").length;
+  const appDirectories = [reportDirectory, portalDirectory, newsDirectory, bmiDirectory];
+  const userCount = appDirectories.reduce((total, item) => total + item.users.length, 0);
+  const onlineCount = appDirectories.reduce(
+    (total, item) => total + item.presence.filter(isOnlinePresence).length,
+    0,
+  );
 
   return (
     <div className="dashboard-view">
@@ -567,9 +601,7 @@ export default function DashboardPage({
           ) : (
             <AppManagementView
               app={selectedApp}
-              directory={
-                selectedApp.key === "bmi" ? bmiDirectory : sharedDirectory
-              }
+              directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
               addToast={addToast}
               onRefresh={onRefresh}
               currentUserEmail={user?.email}

@@ -37,7 +37,12 @@ const normalizeProfile = (profile, source) => ({
       .join(" ") ||
     profile.username ||
     "Unnamed user",
-  role: profile.role || "user",
+  role:
+    source === "bmi" && profile.role === "division"
+      ? "SDO Based"
+      : source === "bmi" && profile.role === "school"
+        ? "School Based"
+        : profile.role || "user",
   source,
 });
 
@@ -55,7 +60,9 @@ function App() {
   const [checking, setChecking] = useState(false);
   const [activePage, setActivePage] = useState(PAGES.dashboard);
   const [directories, setDirectories] = useState({
-    shared: { users: [], presence: [] },
+    report: { users: [], presence: [] },
+    portal: { users: [], presence: [] },
+    news: { users: [], presence: [] },
     bmi: { users: [], presence: [] },
   });
 
@@ -68,10 +75,14 @@ function App() {
   }, []);
 
   const loadDirectories = useCallback(async () => {
-    const [sharedProfiles, bmiProfiles, presence] = await Promise.all([
+    const [sharedProfiles, portalProfiles, bmiProfiles, presence, reportAllowed, portalAllowed, newsAllowed] = await Promise.all([
       supabase.from("profiles").select("*"),
+      supabase.from("portal_profile").select("*"),
       supabase.from("bmi_profiles").select("*"),
       supabase.from("user_presence").select("*"),
+      supabase.from("report_allowed_users").select("email"),
+      supabase.from("portal_allowed_users").select("email"),
+      supabase.from("news_allowed_users").select("email"),
     ]);
 
     if (sharedProfiles.error)
@@ -80,12 +91,28 @@ function App() {
       console.warn("Could not load BMI profiles:", bmiProfiles.error.message);
 
     const presenceRows = presence.error ? [] : (presence.data ?? []);
+    const allowedSet = (result) => new Set(
+      (result.data ?? []).map((row) => row.email?.trim().toLowerCase()),
+    );
+    const profilesFor = (profiles, allowed, source) =>
+      (profiles.data ?? [])
+        .filter((profile) =>
+          profile.app_source === source ||
+          (!profile.app_source && allowed.has(profile.email?.trim().toLowerCase())),
+        )
+        .map((profile) => normalizeProfile(profile, source));
     setDirectories({
-      shared: {
-        users: (sharedProfiles.data ?? []).map((profile) =>
-          normalizeProfile(profile, "shared"),
-        ),
-        presence: presenceRows.filter((row) => row.app_id !== "bmi"),
+      report: {
+        users: profilesFor(sharedProfiles, allowedSet(reportAllowed), "report"),
+        presence: presenceRows.filter((row) => row.app_id === "report"),
+      },
+      portal: {
+        users: profilesFor(portalProfiles, allowedSet(portalAllowed), "portal"),
+        presence: presenceRows.filter((row) => row.app_id === "portal"),
+      },
+      news: {
+        users: profilesFor(sharedProfiles, allowedSet(newsAllowed), "news"),
+        presence: presenceRows.filter((row) => row.app_id === "media"),
       },
       bmi: {
         users: (bmiProfiles.data ?? []).map((profile) =>
