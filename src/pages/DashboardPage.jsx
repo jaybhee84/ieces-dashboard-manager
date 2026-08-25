@@ -10,6 +10,8 @@ import reportLogo from "../image/app-logos/ieces-report.png";
 import portalLogo from "../image/app-logos/ieces-portal.png";
 import newsLogo from "../image/app-logos/ieces-media-manager.png";
 import bmiLogo from "../image/app-logos/deped-bmi.png";
+import bulletinLogo from "../image/idm.png";
+import BulletinManager from "./BulletinManager";
 
 const Icon = ({ name, size = 20 }) => {
   const paths = {
@@ -122,6 +124,15 @@ export const apps = [
       "Track BMI app usage and support requests from the desktop app.",
     logo: bmiLogo,
     tone: "emerald",
+  },
+  {
+    key: "bulletin",
+    title: "Bulletin Manager",
+    category: "Public Website",
+    description:
+      "Create, publish and manage official announcements for the school Bulletin.",
+    logo: bulletinLogo,
+    tone: "school",
   },
 ];
 export { Icon };
@@ -469,7 +480,7 @@ export default function DashboardPage({
           </span>
           <div>
             <p>Managed apps</p>
-            <strong>4</strong>
+            <strong>{apps.length}</strong>
             <span>All systems available</span>
           </div>
         </article>
@@ -501,10 +512,10 @@ export default function DashboardPage({
             <div>
               <h2>Applications</h2>
               <p>
-                Select an application to manage its users and allowed emails.
+                Select an application or website tool to manage.
               </p>
             </div>
-            <span className="section-count">4 applications</span>
+            <span className="section-count">{apps.length} applications</span>
           </div>
           <div className="app-cards">
             {apps.map((app) => (
@@ -548,15 +559,22 @@ export default function DashboardPage({
           >
             <span aria-hidden="true">←</span> Back to applications
           </button>
-          <AppManagementView
-            app={selectedApp}
-            directory={
-              selectedApp.key === "bmi" ? bmiDirectory : sharedDirectory
-            }
-            addToast={addToast}
-            onRefresh={onRefresh}
-            currentUserEmail={user?.email}
-          />
+          {selectedApp.key === "bulletin" ? (
+            <BulletinManager
+              addToast={addToast}
+              currentUserEmail={user?.email}
+            />
+          ) : (
+            <AppManagementView
+              app={selectedApp}
+              directory={
+                selectedApp.key === "bmi" ? bmiDirectory : sharedDirectory
+              }
+              addToast={addToast}
+              onRefresh={onRefresh}
+              currentUserEmail={user?.email}
+            />
+          )}
         </>
       )}
     </div>
