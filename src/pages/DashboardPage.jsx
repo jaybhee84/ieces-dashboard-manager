@@ -10,8 +10,6 @@ import reportLogo from "../image/app-logos/ieces-report.png";
 import portalLogo from "../image/app-logos/ieces-portal.png";
 import newsLogo from "../image/app-logos/ieces-media-manager.png";
 import bmiLogo from "../image/app-logos/deped-bmi.png";
-import bulletinLogo from "../image/idm.png";
-import BulletinManager from "./BulletinManager";
 
 const Icon = ({ name, size = 20 }) => {
   const paths = {
@@ -124,15 +122,6 @@ export const apps = [
       "Track BMI app usage and support requests from the desktop app.",
     logo: bmiLogo,
     tone: "emerald",
-  },
-  {
-    key: "bulletin",
-    title: "Bulletin Manager",
-    category: "Public Website",
-    description:
-      "Create, publish and manage official announcements for the school Bulletin.",
-    logo: bulletinLogo,
-    tone: "school",
   },
 ];
 export { Icon };
@@ -268,33 +257,6 @@ function AppAllowedEmails({ app, currentUserEmail, addToast }) {
 function UserDirectory({ app, directory, addToast, onRefresh }) {
   const [resetting, setResetting] = useState("");
   const [deleting, setDeleting] = useState("");
-  const [allowedEmails, setAllowedEmails] = useState([]);
-
-  useEffect(() => {
-    let active = true;
-    getAppAllowedEmails(app.key).then(({ data, error }) => {
-      if (!active) return;
-      if (error) addToast(`Failed to load allowed emails for ${app.title}.`, "error");
-      else setAllowedEmails(data);
-    });
-    return () => { active = false; };
-  }, [app.key, app.title, addToast]);
-
-  const registeredEmails = new Set(
-    directory.users.map((profile) => profile.email?.trim().toLowerCase()),
-  );
-  const users = [
-    ...directory.users.map((profile) => ({ ...profile, isRegistered: true })),
-    ...allowedEmails
-      .filter((row) => row.email && !registeredEmails.has(row.email.trim().toLowerCase()))
-      .map((row) => ({
-        id: `allowed-${row.id}`,
-        email: row.email,
-        full_name: row.email.split("@")[0],
-        role: "Allowed (not registered)",
-        isRegistered: false,
-      })),
-  ];
   const onlineIds = new Set(
     directory.presence
       .filter(isOnlinePresence)
@@ -345,7 +307,8 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
         <div>
           <strong>Registered users</strong>
           <span>
-            {users.length} user{users.length === 1 ? "" : "s"}
+            {directory.users.length} account
+            {directory.users.length === 1 ? "" : "s"}
           </span>
         </div>
         <span className="online-summary">
@@ -357,27 +320,30 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
           online
         </span>
       </div>
-      {users.length === 0 ? (
+      {directory.users.length === 0 ? (
         <p className="directory-empty">
           No readable user profiles were found for this app.
         </p>
       ) : (
         <div className="user-list">
-          {users.map((profile) => {
+          {directory.users.map((profile) => {
             const isOnline =
               onlineIds.has(profile.id) || onlineIds.has(profile.email);
             return (
               <div className="user-row" key={`${app.key}-${profile.id}`}>
-                <span
-                  className={`presence-dot ${isOnline ? "online" : ""}`}
-                  title={isOnline ? "Online" : "Offline"}
-                />
+                <div className="user-avatar">
+                  {(profile.full_name || profile.email || "U").charAt(0).toUpperCase()}
+                  <span className={`presence-dot ${isOnline ? "online" : ""}`} />
+                </div>
                 <div className="user-identity">
                   <strong>{profile.full_name}</strong>
                   <span>{profile.email}</span>
                 </div>
                 <span className="user-role">{profile.role}</span>
-                {profile.isRegistered ? <div className="user-actions">
+                <span className={`presence-label ${isOnline ? "online" : ""}`}>
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+                <div className="user-actions">
                   <button
                     className="reset-link"
                     disabled={
@@ -396,7 +362,7 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   >
                     {deleting === profile.id ? "Deleting…" : "Delete account"}
                   </button>
-                </div> : null}
+                </div>
               </div>
             );
           })}
@@ -418,9 +384,19 @@ function AppManagementView({
 
   return (
     <section className="app-management-view">
+      <div className="management-title">
+        <span className={`app-logo ${app.tone}`}>
+          <img src={app.logo} alt={`${app.title} logo`} />
+        </span>
+        <div>
+          <span className="app-category">{app.category}</span>
+          <h2>{app.title}</h2>
+          <p>Manage registration access, accounts, and live activity.</p>
+        </div>
+      </div>
+
       <div className="management-toolbar">
-        {/* tabs */}
-        <div style={{ display: "flex", gap: "0.25rem" }}>
+        <div className="management-tabs">
           <button
             className={tab === "users" ? "tab-btn active" : "tab-btn"}
             onClick={() => setTab("users")}
@@ -433,21 +409,6 @@ function AppManagementView({
           >
             <Icon name="shield" size={15} /> Allowed Emails
           </button>
-        </div>
-      </div>
-
-      <div className="management-title">
-        <span className={`app-logo ${app.tone}`}>
-          <img src={app.logo} alt={`${app.title} logo`} />
-        </span>
-        <div>
-          <span className="app-category">{app.category}</span>
-          <h2>{app.title}</h2>
-          <p>
-            {tab === "users"
-              ? "Registered accounts, current activity, password recovery, and account removal."
-              : "Control which emails are allowed to register in this application."}
-          </p>
         </div>
       </div>
 
@@ -546,7 +507,7 @@ export default function DashboardPage({
             <div>
               <h2>Applications</h2>
               <p>
-                Select an application or website tool to manage.
+                Select an application to manage access, users, and activity.
               </p>
             </div>
             <span className="section-count">{apps.length} applications</span>
@@ -593,20 +554,13 @@ export default function DashboardPage({
           >
             <span aria-hidden="true">←</span> Back to applications
           </button>
-          {selectedApp.key === "bulletin" ? (
-            <BulletinManager
-              addToast={addToast}
-              currentUserEmail={user?.email}
-            />
-          ) : (
-            <AppManagementView
-              app={selectedApp}
-              directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
-              addToast={addToast}
-              onRefresh={onRefresh}
-              currentUserEmail={user?.email}
-            />
-          )}
+          <AppManagementView
+            app={selectedApp}
+            directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
+            addToast={addToast}
+            onRefresh={onRefresh}
+            currentUserEmail={user?.email}
+          />
         </>
       )}
     </div>
