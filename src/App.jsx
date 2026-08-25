@@ -83,6 +83,10 @@ function App() {
   const addToast = useCallback((message, type = "info", duration = 4000) => {
     const id = `${Date.now()}-${Math.random()}`;
     setToasts((previous) => [...previous, { id, message, type }]);
+    requestAnimationFrame(() => {
+      window.focus();
+      window.electron?.restoreFocus?.();
+    });
     setTimeout(() => {
       setToasts((previous) => previous.filter((toast) => toast.id !== id));
     }, duration);

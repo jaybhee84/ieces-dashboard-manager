@@ -146,6 +146,13 @@ function createWindow() {
 }
 
 ipcMain.handle('check-for-updates', () => checkForUpdates(true))
+ipcMain.handle('restore-window-focus', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.focus()
+  mainWindow.webContents.focus()
+  return true
+})
 
 app.whenReady().then(() => {
   createApplicationMenu()
