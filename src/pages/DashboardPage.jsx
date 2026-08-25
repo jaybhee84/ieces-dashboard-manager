@@ -329,6 +329,8 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
           {directory.users.map((profile) => {
             const isOnline =
               onlineIds.has(profile.id) || onlineIds.has(profile.email);
+            const isSystemOwner =
+              profile.email?.trim().toLowerCase() === "jaybhee84@gmail.com";
             return (
               <div className="user-row" key={`${app.key}-${profile.id}`}>
                 <div className="user-avatar">
@@ -344,6 +346,10 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   {isOnline ? "Online" : "Offline"}
                 </span>
                 <div className="user-actions">
+                  {isSystemOwner ? (
+                    <span className="user-role">System owner</span>
+                  ) : (
+                    <>
                   <button
                     className="reset-link"
                     disabled={
@@ -362,6 +368,8 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   >
                     {deleting === profile.id ? "Deleting…" : "Delete account"}
                   </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

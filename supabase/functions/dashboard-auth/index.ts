@@ -145,6 +145,15 @@ Deno.serve(async (request: Request) => {
       return json(400, { error: "user_id is required." });
     }
 
+    const { data: targetDashboardProfile } = await supabaseAdmin
+      .from("dashboard_profiles")
+      .select("role")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (targetDashboardProfile?.role === "owner") {
+      return json(403, { error: "The system owner account cannot be deleted." });
+    }
+
     // Check all known per-app profile tables.
     // Add more tables here as new PROJECT RISING apps get profiles.
     const [sharedProfile, bmiProfile] = await Promise.all([
