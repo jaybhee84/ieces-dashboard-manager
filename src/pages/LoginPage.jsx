@@ -1,20 +1,16 @@
 import { useState } from "react";
-import { supabase, dashboardRegister } from "../lib/supabaseClient";
+import { supabase, dashboardLoginEmail, dashboardRegister } from "../lib/supabaseClient";
 import logo from "../image/idm.png";
 import "./LoginPage.css";
 
 // ── Default admin shortcut ────────────────────────────────────────────────────
-// Typing "admin" / "Zeejay1984" maps to the actual Supabase account below.
-const DEFAULT_ADMIN_USERNAME = "admin";
-const DEFAULT_ADMIN_PASSWORD = "Zeejay1984";
-const DEFAULT_ADMIN_EMAIL    = "ieces2024@gmail.com";
-const DEFAULT_ADMIN_PASS     = "admin123";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LoginPage({ onSuccess, addToast }) {
   const [identifier, setIdentifier]   = useState("");
   const [password, setPassword]       = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [username, setUsername]       = useState("");
   const [mode, setMode]               = useState("login");
   const [loading, setLoading]         = useState(false);
 
@@ -37,10 +33,15 @@ export default function LoginPage({ onSuccess, addToast }) {
           addToast("Password must be at least 6 characters.", "error");
           return;
         }
+        if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username.trim())) {
+          addToast("Choose a valid username with 3-32 characters.", "error");
+          return;
+        }
 
         const result = await dashboardRegister({
           email,
           password,
+          username: username.trim().toLowerCase(),
           display_name: displayName.trim() || email,
         });
 
@@ -54,26 +55,25 @@ export default function LoginPage({ onSuccess, addToast }) {
         setIdentifier("");
         setPassword("");
         setDisplayName("");
+        setUsername("");
         return;
       }
 
       // ── Login ───────────────────────────────────────────────────────────────
-      const trimmedId = identifier.trim();
-      const isAdminShortcut =
-        trimmedId.toLowerCase() === DEFAULT_ADMIN_USERNAME &&
-        password === DEFAULT_ADMIN_PASSWORD;
-
-      const loginEmail = isAdminShortcut
-        ? DEFAULT_ADMIN_EMAIL
-        : trimmedId.includes("@")
-        ? trimmedId
-        : `${trimmedId}@ieces.ph`;
-
-      const loginPassword = isAdminShortcut ? DEFAULT_ADMIN_PASS : password;
+      const trimmedId = identifier.trim().toLowerCase();
+      let loginEmail = trimmedId;
+      if (!trimmedId.includes("@")) {
+        const resolved = await dashboardLoginEmail(trimmedId);
+        if (resolved.error || !resolved.email) {
+          addToast("Username was not found.", "error");
+          return;
+        }
+        loginEmail = resolved.email;
+      }
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
-        password: loginPassword,
+        password,
       });
 
       if (error) {
@@ -97,6 +97,7 @@ export default function LoginPage({ onSuccess, addToast }) {
     setIdentifier("");
     setPassword("");
     setDisplayName("");
+    setUsername("");
   };
 
   return (
@@ -138,6 +139,21 @@ export default function LoginPage({ onSuccess, addToast }) {
                 }
               />
             </div>
+
+            {mode === "register" && (
+              <div className="input-group">
+                <label htmlFor="username">Username</label>
+                <input
+                  id="username"
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a login username"
+                  autoCapitalize="none"
+                />
+              </div>
+            )}
 
             {mode === "register" && (
               <div className="input-group">

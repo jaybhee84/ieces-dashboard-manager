@@ -21,8 +21,15 @@ async function callDashboardAuth(body) {
   return data;
 }
 
-export function dashboardRegister({ email, password, display_name }) {
-  return callDashboardAuth({ action: "register", email, password, display_name });
+export function dashboardRegister({ email, password, username, display_name }) {
+  return callDashboardAuth({ action: "register", email, password, username, display_name });
+}
+
+export async function dashboardLoginEmail(username) {
+  const { data, error } = await supabase.rpc("dashboard_login_email", {
+    candidate_username: username.trim().toLowerCase(),
+  });
+  return { email: data || null, error };
 }
 
 export function dashboardDeleteUser(user_id) {

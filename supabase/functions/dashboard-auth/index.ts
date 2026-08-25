@@ -26,22 +26,32 @@ Deno.serve(async (request: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const { action, email, password, display_name, user_id } =
+  const { action, email, password, username, display_name, user_id } =
     (await request.json()) as {
       action?: string;
       email?: string;
       password?: string;
+      username?: string;
       display_name?: string;
       user_id?: string;
     };
 
   // ── REGISTER ───────────────────────────────────────────────────────────────
   if (action === "register") {
-    if (!email || !password) {
-      return json(400, { error: "Email and password are required." });
+    if (!email || !password || !username) {
+      return json(400, { error: "Email, username, and password are required." });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim().toLowerCase();
+    const creatorEmail = "jaybhee84@gmail.com";
+
+    if (!/^[a-z0-9._-]{3,32}$/.test(normalizedUsername)) {
+      return json(400, { error: "Username format is invalid." });
+    }
+    if (normalizedUsername === "admin" && normalizedEmail !== creatorEmail) {
+      return json(403, { error: "The admin username is reserved for the creator." });
+    }
 
     // 1. Whitelist check
     const { data: allowed } = await supabaseAdmin
@@ -67,6 +77,15 @@ Deno.serve(async (request: Request) => {
       return json(409, {
         error: "This email already has a Dashboard Manager account. Please log in.",
       });
+    }
+
+    const { data: existingUsername } = await supabaseAdmin
+      .from("dashboard_profiles")
+      .select("id")
+      .eq("username", normalizedUsername)
+      .maybeSingle();
+    if (existingUsername) {
+      return json(409, { error: "That username is already registered." });
     }
 
     // 3. Check if email already exists in auth.users (used by another app)
@@ -108,7 +127,9 @@ Deno.serve(async (request: Request) => {
       .insert({
         user_id: authUserId,
         email: normalizedEmail,
+        username: normalizedUsername,
         display_name: display_name?.trim() || normalizedEmail,
+        role: normalizedEmail === creatorEmail ? "owner" : "manager",
       });
 
     if (profileErr) {
