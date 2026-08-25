@@ -463,6 +463,8 @@ export default function DashboardPage({
 
   return (
     <div className="dashboard-view">
+      {!selectedApp && (
+        <>
       <header className="view-header">
         <div>
           <p className="eyebrow">Overview</p>
@@ -508,6 +510,8 @@ export default function DashboardPage({
           </div>
         </article>
       </section>
+        </>
+      )}
 
       {!selectedApp ? (
         <section>
