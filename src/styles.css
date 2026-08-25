@@ -1061,6 +1061,8 @@ tbody tr:hover {
 }
 
 .back-button {
+    width: fit-content;
+    justify-self: start;
     min-height: 38px;
     padding: 8px 13px;
     border: 1px solid #dfe4ec;

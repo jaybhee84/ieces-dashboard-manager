@@ -8,7 +8,10 @@ const SUPABASE_ANON_KEY =
   "sb_publishable_aozkBamT5C58KY03X9kUgA_iehy73ZU";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storageKey: "ieces-admin-auth" },
+  auth: {
+    storageKey: "ieces-admin-auth",
+    persistSession: false,
+  },
 });
 
 // ── Dashboard-auth edge function ─────────────────────────────────────────────
