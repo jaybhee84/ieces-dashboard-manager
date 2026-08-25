@@ -454,6 +454,12 @@ export default function DashboardPage({
   const portalDirectory = directories?.portal || { users: [], presence: [] };
   const newsDirectory = directories?.news || { users: [], presence: [] };
   const bmiDirectory = directories?.bmi || { users: [], presence: [] };
+  const directoryByApp = {
+    report: reportDirectory,
+    portal: portalDirectory,
+    news: newsDirectory,
+    bmi: bmiDirectory,
+  };
   const appDirectories = [reportDirectory, portalDirectory, newsDirectory, bmiDirectory];
   const userCount = appDirectories.reduce((total, item) => total + item.users.length, 0);
   const onlineCount = appDirectories.reduce(
@@ -525,7 +531,13 @@ export default function DashboardPage({
             <span className="section-count">{apps.length} applications</span>
           </div>
           <div className="app-cards">
-            {apps.map((app) => (
+            {apps.map((app) => {
+              const appDirectory = directoryByApp[app.key];
+              const registeredCount = appDirectory.users.length;
+              const appOnlineCount = appDirectory.presence.filter(
+                isOnlinePresence,
+              ).length;
+              return (
               <article
                 key={app.key}
                 className="app-card clickable-card"
@@ -549,11 +561,32 @@ export default function DashboardPage({
                   <h3>{app.title}</h3>
                   <p>{app.description}</p>
                 </div>
+                <div className="app-card-stats" aria-label={`${app.title} statistics`}>
+                  <div className="app-card-stat">
+                    <span className="app-card-stat-icon users">
+                      <Icon name="users" size={16} />
+                    </span>
+                    <span>
+                      <strong>{registeredCount}</strong>
+                      <small>Registered</small>
+                    </span>
+                  </div>
+                  <div className="app-card-stat">
+                    <span className="app-card-stat-icon online">
+                      <Icon name="pulse" size={16} />
+                    </span>
+                    <span>
+                      <strong>{appOnlineCount}</strong>
+                      <small>Online now</small>
+                    </span>
+                  </div>
+                </div>
                 <span className="app-link">
                   Manage <Icon name="arrow" size={17} />
                 </span>
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : (

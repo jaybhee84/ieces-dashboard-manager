@@ -433,6 +433,61 @@ h1 {
     line-height: 1.6
 }
 
+.app-card-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px
+}
+
+.app-card-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 1px solid #edf0f4;
+    border-radius: 12px;
+    background: #f8fafc
+}
+
+.app-card-stat-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 9px
+}
+
+.app-card-stat-icon.users {
+    color: #4f46e5;
+    background: #eef2ff
+}
+
+.app-card-stat-icon.online {
+    color: #059669;
+    background: #ecfdf5
+}
+
+.app-card-stat>span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column
+}
+
+.app-card-stat strong {
+    color: #101828;
+    font-size: 1rem;
+    line-height: 1.1
+}
+
+.app-card-stat small {
+    margin-top: 3px;
+    color: #667085;
+    font-size: .68rem
+}
+
 .app-link {
     margin-top: auto;
     padding: 20px 0 0;
