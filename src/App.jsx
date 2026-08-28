@@ -37,9 +37,64 @@ function Toast({ toasts, dismiss }) {
   );
 }
 
+const metadataContainers = (profile) => [
+  profile,
+  profile.user_metadata,
+  profile.raw_user_meta_data,
+  profile.metadata,
+  profile.app_metadata,
+].filter((value) => value && typeof value === "object");
+
+const valueFromProfile = (profile, keys) => {
+  const normalizedKeys = new Set(
+    keys.map((key) => key.toLowerCase().replace(/[^a-z0-9]/g, "")),
+  );
+
+  for (const container of metadataContainers(profile)) {
+    for (const [key, value] of Object.entries(container)) {
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normalizedKeys.has(normalizedKey) && typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+  return "";
+};
+
+const profileEmail = (profile) =>
+  valueFromProfile(profile, [
+    "email",
+    "email_address",
+    "emailAddress",
+    "user_email",
+    "userEmail",
+    "recovery_email",
+  ]);
+
+const profileSource = (profile) =>
+  valueFromProfile(profile, [
+    "app_source",
+    "appSource",
+    "source_app",
+    "sourceApp",
+    "app_id",
+    "appId",
+    "application",
+  ]).toLowerCase();
+
+const sourceAliases = {
+  report: new Set(["report", "ieces-report"]),
+  portal: new Set(["portal", "ieces-portal"]),
+  news: new Set(["news", "media", "news-manager", "ieces-media-manager"]),
+  bmi: new Set(["bmi", "deped-bmi"]),
+};
+
+const matchesSource = (registeredSource, source) =>
+  sourceAliases[source]?.has(registeredSource) ?? registeredSource === source;
+
 const normalizeProfile = (profile, source) => ({
   id: profile.id,
-  email: profile.email || profile.username || "No email available",
+  email: profileEmail(profile) || profile.username || "No email available",
   full_name:
     profile.full_name ||
     profile.fullname ||
@@ -94,18 +149,19 @@ function App() {
   }, []);
 
   const loadDirectories = useCallback(async () => {
-    const [sharedProfiles, portalProfiles, bmiProfiles, presence, reportAllowed, portalAllowed, newsAllowed] = await Promise.all([
+    const [sharedProfiles, portalProfiles, bmiProfiles, presence, reportAllowed, newsAllowed] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("portal_profile").select("*"),
       supabase.from("bmi_profiles").select("*"),
       supabase.from("user_presence").select("*"),
       supabase.from("report_allowed_users").select("email"),
-      supabase.from("portal_allowed_users").select("email"),
       supabase.from("news_allowed_users").select("email"),
     ]);
 
     if (sharedProfiles.error)
       console.warn("Could not load IECES profiles:", sharedProfiles.error.message);
+    if (portalProfiles.error)
+      console.warn("Could not load Portal profiles:", portalProfiles.error.message);
     if (bmiProfiles.error)
       console.warn("Could not load BMI profiles:", bmiProfiles.error.message);
 
@@ -115,10 +171,14 @@ function App() {
     );
     const profilesFor = (profiles, allowed, source) =>
       (profiles.data ?? [])
-        .filter((profile) =>
-          profile.app_source === source ||
-          (!profile.app_source && allowed.has(profile.email?.trim().toLowerCase())),
-        )
+        .filter((profile) => {
+          const registeredSource = profileSource(profile);
+          const registeredEmail = profileEmail(profile).toLowerCase();
+          return (
+            matchesSource(registeredSource, source) ||
+            (!registeredSource && registeredEmail && allowed.has(registeredEmail))
+          );
+        })
         .map((profile) => normalizeProfile(profile, source));
     setDirectories({
       report: {
@@ -126,7 +186,12 @@ function App() {
         presence: presenceRows.filter((row) => row.app_id === "report"),
       },
       portal: {
-        users: profilesFor(portalProfiles, allowedSet(portalAllowed), "portal"),
+        // portal_profile is app-specific, so every row represents a registered
+        // Portal account. Registration does not imply the email is still in the
+        // whitelist, and older rows may not contain app_source metadata.
+        users: (portalProfiles.data ?? []).map((profile) =>
+          normalizeProfile(profile, "portal"),
+        ),
         presence: presenceRows.filter((row) => row.app_id === "portal"),
       },
       news: {
