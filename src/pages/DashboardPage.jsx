@@ -130,6 +130,11 @@ const isOnlinePresence = (entry) =>
   entry.status === "online" &&
   (!entry.last_seen || Date.now() - new Date(entry.last_seen).getTime() < 120000);
 
+const presenceKeys = (entry) =>
+  [entry.user_id, entry.id, entry.email]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase());
+
 // ── Allowed Emails Tab ────────────────────────────────────────────────────────
 function AppAllowedEmails({ app, currentUserEmail, addToast }) {
   const [emails, setEmails] = useState([]);
@@ -227,7 +232,7 @@ function AppAllowedEmails({ app, currentUserEmail, addToast }) {
           No emails whitelisted yet. Add one above to allow registration.
         </p>
       ) : (
-        <div className="user-list">
+        <div className="user-list allowed-users-list">
           {emails.map((row) => (
             <div className="allowed-email-row" key={row.id}>
               <div className="user-identity">
@@ -260,9 +265,7 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
   const onlineIds = new Set(
     directory.presence
       .filter(isOnlinePresence)
-      .flatMap((entry) =>
-        [entry.user_id, entry.id, entry.email].filter(Boolean),
-      ),
+      .flatMap(presenceKeys),
   );
 
   const sendPasswordReset = async (profile) => {
@@ -325,10 +328,11 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
           No readable user profiles were found for this app.
         </p>
       ) : (
-        <div className="user-list">
+        <div className="user-list registered-users-list">
           {directory.users.map((profile) => {
-            const isOnline =
-              onlineIds.has(profile.id) || onlineIds.has(profile.email);
+            const isOnline = presenceKeys(profile).some((key) =>
+              onlineIds.has(key),
+            );
             const isSystemOwner =
               profile.email?.trim().toLowerCase() === "jaybhee84@gmail.com";
             return (
@@ -338,13 +342,15 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
                   <span className={`presence-dot ${isOnline ? "online" : ""}`} />
                 </div>
                 <div className="user-identity">
-                  <strong>{profile.full_name}</strong>
+                  <div className="registered-user-heading">
+                    <strong>{profile.full_name}</strong>
+                    <span className={`presence-label ${isOnline ? "online" : ""}`}>
+                      {isOnline ? "Online" : "Offline"}
+                    </span>
+                  </div>
                   <span>{profile.email}</span>
                 </div>
                 <span className="user-role">{profile.role}</span>
-                <span className={`presence-label ${isOnline ? "online" : ""}`}>
-                  {isOnline ? "Online" : "Offline"}
-                </span>
                 <div className="user-actions">
                   {isSystemOwner ? (
                     <span className="user-role">System owner</span>
@@ -590,23 +596,13 @@ export default function DashboardPage({
           </div>
         </section>
       ) : (
-        <>
-          <button
-            className="back-button"
-            onClick={() => setSelectedApp(null)}
-            aria-label="Back to applications"
-            style={{ marginBottom: "1rem" }}
-          >
-            <span aria-hidden="true">←</span> Back to applications
-          </button>
-          <AppManagementView
-            app={selectedApp}
-            directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
-            addToast={addToast}
-            onRefresh={onRefresh}
-            currentUserEmail={user?.email}
-          />
-        </>
+        <AppManagementView
+          app={selectedApp}
+          directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
+          addToast={addToast}
+          onRefresh={onRefresh}
+          currentUserEmail={user?.email}
+        />
       )}
     </div>
   );

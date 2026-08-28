@@ -1390,10 +1390,24 @@ tbody tr:hover {
     max-height: 420px
 }
 
+.registered-users-list {
+    max-height: 650px;
+    overflow-x: hidden;
+    overflow-y: auto
+}
+
+.allowed-users-list {
+    max-height: 600px;
+    overflow-y: auto
+}
+
 .user-row {
-    min-width: 850px;
+    width: 100%;
+    min-width: 0;
+    min-height: 65px;
+    box-sizing: border-box;
     padding: 14px 18px;
-    grid-template-columns: 42px minmax(190px, 1fr) 130px 74px 220px;
+    grid-template-columns: 42px minmax(150px, 1fr) max-content max-content;
     gap: 14px;
     border-top: 0;
     border-bottom: 1px solid #edf2f7;
@@ -1433,8 +1447,8 @@ tbody tr:hover {
 
 .user-identity span {
     margin-top: 2px;
-    color: #94a3b8;
-    font-size: .7rem
+    color: #64748b;
+    font-size: .72rem
 }
 
 .user-role,
@@ -1447,18 +1461,67 @@ tbody tr:hover {
 }
 
 .user-role {
-    color: #475569;
-    background: #f1f5f9
+    color: #334155;
+    background: #e9eef5
 }
 
 .presence-label {
-    color: #64748b;
-    background: #f1f5f9
+    color: #475569;
+    background: #e9eef5
 }
 
 .presence-label.online {
     color: #067647;
     background: #ecfdf3
+}
+
+.registered-user-heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px
+}
+
+.registered-user-heading .presence-label {
+    flex: 0 0 auto;
+    margin-top: 0
+}
+
+.online-summary {
+    color: #475569
+}
+
+.reset-link {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important
+}
+
+.delete-link {
+    color: #b42318 !important;
+    background: #fff1f0 !important;
+    border-color: #fecaca !important
+}
+
+@media(max-width:720px) {
+    .card-user-directory {
+        overflow-x: hidden
+    }
+
+    .directory-heading {
+        min-width: 0
+    }
+
+    .user-row {
+        grid-template-columns: 42px minmax(0, 1fr) max-content;
+        gap: 10px
+    }
+
+    .user-actions {
+        grid-column: 2 / -1;
+        justify-content: flex-start;
+        flex-wrap: wrap
+    }
 }
 
 .allowed-emails-form {
@@ -1470,6 +1533,8 @@ tbody tr:hover {
 }
 
 .allowed-email-row {
+    min-height: 60px;
+    box-sizing: border-box;
     padding: 14px 18px
 }
 

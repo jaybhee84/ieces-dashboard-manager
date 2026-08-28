@@ -73,6 +73,7 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [checking, setChecking] = useState(false);
   const [activePage, setActivePage] = useState(PAGES.dashboard);
+  const [dashboardNavigationKey, setDashboardNavigationKey] = useState(0);
   const [directories, setDirectories] = useState({
     report: { users: [], presence: [] },
     portal: { users: [], presence: [] },
@@ -175,6 +176,23 @@ function App() {
   }, [session, loadDirectories]);
 
   useEffect(() => {
+    if (!session) return undefined;
+
+    const refreshPresence = () => {
+      if (document.visibilityState === "visible") loadDirectories();
+    };
+    const intervalId = window.setInterval(refreshPresence, 15000);
+    window.addEventListener("focus", refreshPresence);
+    document.addEventListener("visibilitychange", refreshPresence);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshPresence);
+      document.removeEventListener("visibilitychange", refreshPresence);
+    };
+  }, [session, loadDirectories]);
+
+  useEffect(() => {
     if (!window.electron?.onUpdateStatus) return undefined;
     return window.electron.onUpdateStatus(({ status, message, progress }) => {
       const type = status === "error" ? "error" : "info";
@@ -260,7 +278,10 @@ function App() {
         <nav aria-label="Main navigation">
           <button
             className={activePage === PAGES.dashboard ? "active" : ""}
-            onClick={() => setActivePage(PAGES.dashboard)}
+            onClick={() => {
+              setActivePage(PAGES.dashboard);
+              setDashboardNavigationKey((key) => key + 1);
+            }}
           >
             <Icon name="grid" /> Dashboard
           </button>
@@ -294,6 +315,7 @@ function App() {
       <main className="main-content">
         {activePage === PAGES.dashboard && (
           <DashboardPage
+            key={dashboardNavigationKey}
             user={user}
             directories={directories}
             onRefresh={loadDirectories}
