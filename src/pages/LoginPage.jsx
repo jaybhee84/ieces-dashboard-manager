@@ -6,12 +6,54 @@ import "./LoginPage.css";
 // ── Default admin shortcut ────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
+function PasswordInput({ id, value, onChange, placeholder }) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="password-field">
+      <input
+        id={id}
+        type={visible ? "text" : "password"}
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        className="password-toggle"
+        onClick={() => setVisible((shown) => !shown)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        title={visible ? "Hide password" : "Show password"}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+          {visible && <line x1="3" y1="3" x2="21" y2="21" />}
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function LoginPage({ onSuccess, addToast }) {
   const [identifier, setIdentifier]   = useState("");
   const [password, setPassword]       = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername]       = useState("");
-  const [mode, setMode]               = useState("login");
+  const [mode,setMode]               = useState("login");
   const [loading, setLoading]         = useState(false);
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -31,6 +73,10 @@ export default function LoginPage({ onSuccess, addToast }) {
         }
         if (password.length < 6) {
           addToast("Password must be at least 6 characters.", "error");
+          return;
+        }
+        if (password !== confirmPassword) {
+          addToast("The passwords do not match. Re-enter them.", "error");
           return;
         }
         if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username.trim())) {
@@ -54,6 +100,7 @@ export default function LoginPage({ onSuccess, addToast }) {
         setMode("login");
         setIdentifier("");
         setPassword("");
+        setConfirmPassword("");
         setDisplayName("");
         setUsername("");
         return;
@@ -96,6 +143,7 @@ export default function LoginPage({ onSuccess, addToast }) {
     setMode(next);
     setIdentifier("");
     setPassword("");
+    setConfirmPassword("");
     setDisplayName("");
     setUsername("");
   };
@@ -170,15 +218,29 @@ export default function LoginPage({ onSuccess, addToast }) {
 
             <div className="input-group">
               <label htmlFor="password">Password</label>
-              <input
+              <PasswordInput
+                key={mode}
                 id="password"
-                type="password"
-                required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 placeholder="Enter password"
               />
             </div>
+
+            {mode === "register" && (
+              <div className="input-group">
+                <label htmlFor="confirm_password">Confirm password</label>
+                <PasswordInput
+                  id="confirm_password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder="Re-enter password"
+                />
+                {confirmPassword && confirmPassword !== password && (
+                  <span className="input-error">Passwords do not match.</span>
+                )}
+              </div>
+            )}
 
             <div className="form-actions">
               <button type="submit" className="primary-btn" disabled={loading}>

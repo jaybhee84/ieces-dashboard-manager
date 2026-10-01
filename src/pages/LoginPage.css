@@ -272,3 +272,39 @@
     padding: 1.5rem 1.25rem;
   }
 }
+.input-error {
+  color: #b42318;
+  font-size: 0.75rem;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 2.9rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+  color: #f1f5f9;
+  background: rgba(148, 163, 184, 0.14);
+  outline: none;
+}

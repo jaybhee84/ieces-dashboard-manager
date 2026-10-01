@@ -56,75 +56,70 @@ export default function AllowedEmailsPage({ currentUserEmail, addToast }) {
   };
 
   return (
-    <section className="panel-card">
-      <header>
+    <section className="manage-view">
+      <header className="manage-title">
         <div>
-          <p className="eyebrow">Access Control</p>
+          <p className="eyebrow">Access Control · Owner only</p>
           <h2>Allowed Emails</h2>
           <p>
-            Only emails in this list can register a Dashboard Manager account.
-            Emails already used by other apps (BMI, Portal, etc.) can still be
-            added here — they will share the same auth login but get a separate
-            dashboard profile.
+            Emails listed here can register as an administrator of this
+            dashboard. Other administrators cannot see or change this list.
           </p>
         </div>
       </header>
 
-      {/* ── Add form ── */}
-      <form
-        style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem", flexWrap: "wrap" }}
-        onSubmit={handleAdd}
-      >
-        <input
-          type="email"
-          placeholder="new.email@example.com"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          style={{ flex: "1 1 260px", minWidth: 0 }}
-          required
-        />
-        <button type="submit" className="primary-btn" disabled={adding}>
-          {adding ? "Adding…" : "Add email"}
-        </button>
-      </form>
-
-      {/* ── List ── */}
-      {loading ? (
-        <p>Loading…</p>
-      ) : emails.length === 0 ? (
-        <p className="directory-empty">No emails in the whitelist yet. Add one above.</p>
-      ) : (
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Added by</th>
-                <th>Date added</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {emails.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.email}</td>
-                  <td>{row.added_by || "—"}</td>
-                  <td>{new Date(row.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      className="delete-link"
-                      disabled={removingId === row.id}
-                      onClick={() => handleRemove(row.id, row.email)}
-                    >
-                      {removingId === row.id ? "Removing…" : "Remove"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="manage-col">
+        <div className="manage-col-head">
+          <div>
+            <h3>
+              Dashboard administrators{" "}
+              <span className="manage-count">{emails.length}</span>
+            </h3>
+          </div>
+          <form className="manage-form-row" onSubmit={handleAdd}>
+            <input
+              type="email"
+              aria-label="Email address to allow"
+              placeholder="name@example.com"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              required
+            />
+            <button type="submit" className="manage-btn" disabled={adding}>
+              {adding ? "Adding…" : "Add email"}
+            </button>
+          </form>
         </div>
-      )}
+
+        {loading ? (
+          <p className="manage-empty">Loading…</p>
+        ) : emails.length === 0 ? (
+          <p className="manage-empty">No emails in the list yet. Add one above.</p>
+        ) : (
+          <ul className="manage-list">
+            {emails.map((row) => (
+              <li className="manage-row" key={row.id}>
+                <div className="manage-row-main">
+                  <strong>{row.email}</strong>
+                  <span>
+                    Added by {row.added_by || "—"} ·{" "}
+                    {new Date(row.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="manage-row-actions">
+                  <button
+                    className="manage-link danger"
+                    disabled={removingId === row.id}
+                    onClick={() => handleRemove(row.id, row.email)}
+                  >
+                    {removingId === row.id ? "Removing…" : "Remove"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

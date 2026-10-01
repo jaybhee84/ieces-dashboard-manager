@@ -20,8 +20,34 @@ async function callDashboardAuth(body) {
   const { data, error } = await supabase.functions.invoke("dashboard-auth", {
     body,
   });
-  if (error) return { error: error.message || "Edge function error." };
+  if (error) {
+    // Non-2xx replies carry the real reason in the response body.
+    const details = await error.context?.json?.().catch(() => null);
+    return { error: details?.error || error.message || "Edge function error." };
+  }
   return data;
+}
+
+// action: "account_status" | "set_password" | "confirm_email" | "set_disabled"
+// Runs in SQL (dashboard_account_action) because every IECES app shares this
+// Supabase Auth project.
+export async function dashboardAccountAction(action, profile, extra = {}) {
+  const { data, error } = await supabase.rpc("dashboard_account_action", {
+    action,
+    target_user_id: profile.id ? String(profile.id) : null,
+    target_email: profile.email ?? null,
+    new_password: extra.password ?? null,
+    disable: extra.disabled ?? null,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "PGRST202"
+          ? "Account help is not set up in the database yet. Run the dashboard_account_action SQL script."
+          : error.message || "The account could not be updated.",
+    };
+  }
+  return { account: data };
 }
 
 export function dashboardRegister({ email, password, username, display_name }) {
@@ -65,7 +91,7 @@ export async function getAllowedEmails() {
 }
 
 // ── Per-app allowed emails ────────────────────────────────────────────────────
-// appKey: "report" | "portal" | "news" | "bmi"
+// appKey: "report" | "portal" | "news"
 // Maps to table: report_allowed_users, portal_allowed_users, etc.
 
 const appTable = (appKey) => `${appKey}_allowed_users`;

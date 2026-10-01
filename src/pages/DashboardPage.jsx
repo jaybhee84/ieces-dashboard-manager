@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   supabase,
   dashboardDeleteUser,
+  dashboardAccountAction,
   getAppAllowedEmails,
   addAppAllowedEmail,
   removeAppAllowedEmail,
@@ -9,7 +10,6 @@ import {
 import reportLogo from "../image/app-logos/ieces-report.png";
 import portalLogo from "../image/app-logos/ieces-portal.png";
 import newsLogo from "../image/app-logos/ieces-media-manager.png";
-import bmiLogo from "../image/app-logos/deped-bmi.png";
 
 const Icon = ({ name, size = 20 }) => {
   const paths = {
@@ -47,6 +47,12 @@ const Icon = ({ name, size = 20 }) => {
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
+      </>
+    ),
+    book: (
+      <>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       </>
     ),
     shield: (
@@ -114,15 +120,6 @@ export const apps = [
     logo: newsLogo,
     tone: "amber",
   },
-  {
-    key: "bmi",
-    title: "DepEd BMI App",
-    category: "Health",
-    description:
-      "Track BMI app usage and support requests from the desktop app.",
-    logo: bmiLogo,
-    tone: "emerald",
-  },
 ];
 export { Icon };
 
@@ -135,7 +132,7 @@ const presenceKeys = (entry) =>
     .filter(Boolean)
     .map((value) => String(value).trim().toLowerCase());
 
-// ── Allowed Emails Tab ────────────────────────────────────────────────────────
+// ── Allow access column ───────────────────────────────────────────────────────
 function AppAllowedEmails({ app, currentUserEmail, addToast }) {
   const [emails, setEmails] = useState([]);
   const [newEmail, setNewEmail] = useState("");
@@ -194,74 +191,245 @@ function AppAllowedEmails({ app, currentUserEmail, addToast }) {
   };
 
   return (
-    <div className="card-user-directory">
-      <div className="directory-heading">
+    <section className="manage-col" aria-labelledby="manage-allow-title">
+      <header className="manage-col-head">
         <div>
-          <strong>Allowed Emails</strong>
-          <span>
-            Only these emails can register in {app.title}. {emails.length} email
-            {emails.length !== 1 ? "s" : ""} whitelisted.
-          </span>
+          <h3 id="manage-allow-title">
+            Allowed emails <span className="manage-count">{emails.length}</span>
+          </h3>
+          <p>Only these emails can register in {app.title}.</p>
         </div>
-      </div>
+      </header>
 
-      {/* Add form */}
-      <form className="allowed-emails-form" onSubmit={handleAdd}>
-        <input
-          type="email"
-          placeholder="email@example.com"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          required
-        />
-        <button type="submit" className="add-btn" disabled={adding}>
-          {adding ? (
-            "Adding…"
-          ) : (
-            <>
-              <Icon name="plus" size={14} /> Add email
-            </>
-          )}
-        </button>
+      <form className="manage-form" onSubmit={handleAdd}>
+        <div className="manage-form-row">
+          <input
+            id="manage-allow-email"
+            type="email"
+            aria-label="Email address to allow"
+            placeholder="name@example.com"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            required
+          />
+          <button type="submit" className="manage-btn" disabled={adding}>
+            {adding ? (
+              "Adding…"
+            ) : (
+              <>
+                <Icon name="plus" size={14} /> Allow
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       {loading ? (
-        <p className="directory-empty">Loading…</p>
+        <p className="manage-empty">Loading…</p>
       ) : emails.length === 0 ? (
-        <p className="directory-empty">
-          No emails whitelisted yet. Add one above to allow registration.
+        <p className="manage-empty">
+          No emails allowed yet. Add one above to open registration.
         </p>
       ) : (
-        <div className="user-list allowed-users-list">
+        <ul className="manage-list">
           {emails.map((row) => (
-            <div className="allowed-email-row" key={row.id}>
-              <div className="user-identity">
+            <li className="manage-row" key={row.id}>
+              <div className="manage-row-main">
                 <strong>{row.email}</strong>
                 <span>
                   Added by {row.added_by || "—"} ·{" "}
                   {new Date(row.created_at).toLocaleDateString()}
                 </span>
               </div>
-              <button
-                className="icon-btn"
-                disabled={removingId === row.id}
-                onClick={() => handleRemove(row.id, row.email)}
-                title="Remove from whitelist"
-              >
-                {removingId === row.id ? "…" : <Icon name="trash" size={14} />}
-              </button>
-            </div>
+              <div className="manage-row-actions">
+                <button
+                  className="manage-link danger"
+                  disabled={removingId === row.id}
+                  onClick={() => handleRemove(row.id, row.email)}
+                >
+                  {removingId === row.id ? "Removing…" : "Remove"}
+                </button>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
+    </section>
+  );
+}
+
+// ── Account help panel ────────────────────────────────────────────────────────
+const formatWhen = (value) =>
+  value ? new Date(value).toLocaleString() : "Never";
+
+const generatePassword = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const picks = crypto.getRandomValues(new Uint32Array(10));
+  return Array.from(picks, (n) => chars[n % chars.length]).join("");
+};
+
+function AccountHelp({ profile, addToast, resetting, onSendReset }) {
+  const [account, setAccount] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [working, setWorking] = useState("");
+  const [tempPassword, setTempPassword] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    dashboardAccountAction("account_status", profile).then((result) => {
+      if (cancelled) return;
+      if (result?.error) setLoadError(result.error);
+      else setAccount(result.account);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id, profile.email]);
+
+  const run = async (action, extra, successMessage) => {
+    setWorking(action);
+    const result = await dashboardAccountAction(action, profile, extra);
+    setWorking("");
+    if (result?.error) {
+      addToast(result.error, "error");
+      return;
+    }
+    setAccount(result.account);
+    addToast(successMessage, "success");
+  };
+
+  const setPassword = (event) => {
+    event.preventDefault();
+    if (tempPassword.length < 8) {
+      addToast("The temporary password needs at least 8 characters.", "error");
+      return;
+    }
+    run(
+      "set_password",
+      { password: tempPassword },
+      `Temporary password set for ${profile.email}. Share it with the user.`,
+    );
+  };
+
+  if (loadError)
+    return (
+      <div className="manage-help">
+        <p className="manage-help-error">
+          Could not load this account: {loadError} You can still send a reset
+          email.
+        </p>
+        <div className="manage-help-actions">
+          <button
+            className="manage-link"
+            disabled={resetting}
+            onClick={onSendReset}
+          >
+            {resetting ? "Sending…" : "Send reset email"}
+          </button>
+        </div>
+      </div>
+    );
+  if (!account)
+    return (
+      <div className="manage-help">
+        <p className="manage-help-note">Loading account details…</p>
+      </div>
+    );
+
+  const busy = Boolean(working) || resetting;
+  return (
+    <div className="manage-help">
+      <dl className="manage-facts">
+        <div>
+          <dt>Last sign-in</dt>
+          <dd>{formatWhen(account.last_sign_in_at)}</dd>
+        </div>
+        <div>
+          <dt>Registered</dt>
+          <dd>{formatWhen(account.created_at)}</dd>
+        </div>
+        <div>
+          <dt>Email</dt>
+          <dd className={account.email_confirmed ? "" : "warn"}>
+            {account.email_confirmed ? "Confirmed" : "Not confirmed"}
+          </dd>
+        </div>
+        <div>
+          <dt>Sign-in</dt>
+          <dd className={account.disabled ? "warn" : ""}>
+            {account.disabled ? "Disabled" : "Enabled"}
+          </dd>
+        </div>
+      </dl>
+
+      <form className="manage-help-password" onSubmit={setPassword}>
+        <input
+          type="text"
+          aria-label="Temporary password"
+          placeholder="Temporary password (8+ characters)"
+          autoComplete="off"
+          spellCheck="false"
+          value={tempPassword}
+          onChange={(e) => setTempPassword(e.target.value)}
+        />
+        <button
+          type="button"
+          className="manage-link"
+          disabled={busy}
+          onClick={() => setTempPassword(generatePassword())}
+        >
+          Generate
+        </button>
+        <button type="submit" className="manage-btn" disabled={busy}>
+          {working === "set_password" ? "Saving…" : "Set password"}
+        </button>
+      </form>
+
+      <div className="manage-help-actions">
+        <button className="manage-link" disabled={busy} onClick={onSendReset}>
+          {resetting ? "Sending…" : "Send reset email"}
+        </button>
+        {!account.email_confirmed && (
+          <button
+            className="manage-link"
+            disabled={busy}
+            onClick={() =>
+              run("confirm_email", {}, `${profile.email} is now confirmed.`)
+            }
+          >
+            {working === "confirm_email" ? "Confirming…" : "Confirm email"}
+          </button>
+        )}
+        <button
+          className={`manage-link ${account.disabled ? "" : "danger"}`}
+          disabled={busy}
+          onClick={() =>
+            run(
+              "set_disabled",
+              { disabled: !account.disabled },
+              account.disabled
+                ? `${profile.full_name} can sign in again.`
+                : `${profile.full_name} can no longer sign in.`,
+            )
+          }
+        >
+          {working === "set_disabled"
+            ? "Saving…"
+            : account.disabled
+              ? "Enable sign-in"
+              : "Disable sign-in"}
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── User Directory Tab ────────────────────────────────────────────────────────
+// ── Registered users column ───────────────────────────────────────────────────
 function UserDirectory({ app, directory, addToast, onRefresh }) {
   const [resetting, setResetting] = useState("");
   const [deleting, setDeleting] = useState("");
+  const [confirming, setConfirming] = useState("");
+  const [helping, setHelping] = useState("");
   const onlineIds = new Set(
     directory.presence
       .filter(isOnlinePresence)
@@ -283,11 +451,7 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
   };
 
   const deleteAccount = async (profile) => {
-    const confirmed = window.confirm(
-      `Permanently delete ${profile.full_name} (${profile.email})?\n\nThis removes the login account and cannot be undone.`,
-    );
-    if (!confirmed) return;
-
+    setConfirming("");
     setDeleting(profile.id);
     const result = await dashboardDeleteUser(profile.id);
     setDeleting("");
@@ -305,141 +469,145 @@ function UserDirectory({ app, directory, addToast, onRefresh }) {
   };
 
   return (
-    <div className="card-user-directory">
-      <div className="directory-heading">
+    <section className="manage-col" aria-labelledby="manage-users-title">
+      <header className="manage-col-head">
         <div>
-          <strong>Registered users</strong>
-          <span>
-            {directory.users.length} account
-            {directory.users.length === 1 ? "" : "s"}
-          </span>
+          <h3 id="manage-users-title">
+            Registered users{" "}
+            <span className="manage-count">{directory.users.length}</span>
+          </h3>
+          <p>Accounts that have signed up for {app.title}.</p>
         </div>
-        <span className="online-summary">
-          <i />
-          {
-            directory.presence.filter(isOnlinePresence)
-              .length
-          }{" "}
-          online
+        <span className="manage-online">
+          <i className="manage-dot online" />
+          {directory.presence.filter(isOnlinePresence).length} online
         </span>
-      </div>
+      </header>
+
       {directory.users.length === 0 ? (
-        <p className="directory-empty">
+        <p className="manage-empty">
           No readable user profiles were found for this app.
         </p>
       ) : (
-        <div className="user-list registered-users-list">
+        <ul className="manage-list">
           {directory.users.map((profile) => {
             const isOnline = presenceKeys(profile).some((key) =>
               onlineIds.has(key),
             );
             const isSystemOwner =
               profile.email?.trim().toLowerCase() === "jaybhee84@gmail.com";
+            const busy = resetting === profile.id || deleting === profile.id;
+            const isConfirming = confirming === profile.id;
+            const isHelping = helping === profile.id;
             return (
-              <div className="user-row" key={`${app.key}-${profile.id}`}>
-                <div className="user-avatar">
-                  {(profile.full_name || profile.email || "U").charAt(0).toUpperCase()}
-                  <span className={`presence-dot ${isOnline ? "online" : ""}`} />
-                </div>
-                <div className="user-identity">
-                  <div className="registered-user-heading">
-                    <strong>{profile.full_name}</strong>
-                    <span className={`presence-label ${isOnline ? "online" : ""}`}>
-                      {isOnline ? "Online" : "Offline"}
-                    </span>
-                  </div>
+              <li
+                className={`manage-row ${isConfirming ? "confirming" : ""} ${isHelping ? "open" : ""}`}
+                key={`${app.key}-${profile.id}`}
+              >
+                <div className="manage-row-main">
+                  <strong>
+                    <i
+                      className={`manage-dot ${isOnline ? "online" : ""}`}
+                      title={isOnline ? "Online" : "Offline"}
+                    />
+                    {profile.full_name}
+                  </strong>
                   <span>{profile.email}</span>
                 </div>
-                <span className="user-role">{profile.role}</span>
-                <div className="user-actions">
-                  {isSystemOwner ? (
-                    <span className="user-role">System owner</span>
-                  ) : (
-                    <>
-                  <button
-                    className="reset-link"
-                    disabled={
-                      resetting === profile.id || deleting === profile.id
-                    }
-                    onClick={() => sendPasswordReset(profile)}
-                  >
-                    {resetting === profile.id ? "Sending…" : "Reset password"}
-                  </button>
-                  <button
-                    className="delete-link"
-                    disabled={
-                      deleting === profile.id || resetting === profile.id
-                    }
-                    onClick={() => deleteAccount(profile)}
-                  >
-                    {deleting === profile.id ? "Deleting…" : "Delete account"}
-                  </button>
-                    </>
-                  )}
-                </div>
-              </div>
+                <span className="manage-tag">
+                  {isSystemOwner ? "System owner" : profile.role}
+                </span>
+                {isSystemOwner ? null : isConfirming ? (
+                  <div className="manage-row-actions">
+                    <span className="manage-confirm-text">Delete permanently?</span>
+                    <button
+                      className="manage-btn danger"
+                      onClick={() => deleteAccount(profile)}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      className="manage-link"
+                      onClick={() => setConfirming("")}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="manage-row-actions">
+                    <button
+                      className="manage-link"
+                      aria-expanded={isHelping}
+                      onClick={() => setHelping(isHelping ? "" : profile.id)}
+                    >
+                      {isHelping ? "Close" : "Account help"}
+                    </button>
+                    <button
+                      className="manage-link danger"
+                      disabled={busy}
+                      onClick={() => setConfirming(profile.id)}
+                    >
+                      {deleting === profile.id ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+                )}
+                {isHelping && !isSystemOwner && (
+                  <AccountHelp
+                    profile={profile}
+                    addToast={addToast}
+                    resetting={resetting === profile.id}
+                    onSendReset={() => sendPasswordReset(profile)}
+                  />
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
-    </div>
+    </section>
   );
 }
 
-// ── App Management View (tabbed) ──────────────────────────────────────────────
+// ── App Management View ───────────────────────────────────────────────────────
 function AppManagementView({
   app,
   directory,
   addToast,
   onRefresh,
+  onBack,
   currentUserEmail,
 }) {
-  const [tab, setTab] = useState("users");
-
   return (
-    <section className="app-management-view">
-      <div className="management-title">
+    <section className="manage-view">
+      <header className="manage-title">
+        <button className="manage-back" onClick={onBack}>
+          ← Applications
+        </button>
         <span className={`app-logo ${app.tone}`}>
-          <img src={app.logo} alt={`${app.title} logo`} />
+          <img src={app.logo} alt="" />
         </span>
         <div>
-          <span className="app-category">{app.category}</span>
           <h2>{app.title}</h2>
-          <p>Manage registration access, accounts, and live activity.</p>
+          <p>Manage who can register and remove existing accounts.</p>
         </div>
-      </div>
+        <button className="button button-secondary" onClick={onRefresh}>
+          <Icon name="refresh" size={16} /> Refresh
+        </button>
+      </header>
 
-      <div className="management-toolbar">
-        <div className="management-tabs">
-          <button
-            className={tab === "users" ? "tab-btn active" : "tab-btn"}
-            onClick={() => setTab("users")}
-          >
-            <Icon name="users" size={15} /> Registered Users
-          </button>
-          <button
-            className={tab === "allowed" ? "tab-btn active" : "tab-btn"}
-            onClick={() => setTab("allowed")}
-          >
-            <Icon name="shield" size={15} /> Allowed Emails
-          </button>
-        </div>
-      </div>
-
-      {tab === "users" ? (
+      <div className="manage-grid">
+        <AppAllowedEmails
+          app={app}
+          currentUserEmail={currentUserEmail}
+          addToast={addToast}
+        />
         <UserDirectory
           app={app}
           directory={directory}
           addToast={addToast}
           onRefresh={onRefresh}
         />
-      ) : (
-        <AppAllowedEmails
-          app={app}
-          currentUserEmail={currentUserEmail}
-          addToast={addToast}
-        />
-      )}
+      </div>
     </section>
   );
 }
@@ -459,14 +627,12 @@ export default function DashboardPage({
   const reportDirectory = directories?.report || { users: [], presence: [] };
   const portalDirectory = directories?.portal || { users: [], presence: [] };
   const newsDirectory = directories?.news || { users: [], presence: [] };
-  const bmiDirectory = directories?.bmi || { users: [], presence: [] };
   const directoryByApp = {
     report: reportDirectory,
     portal: portalDirectory,
     news: newsDirectory,
-    bmi: bmiDirectory,
   };
-  const appDirectories = [reportDirectory, portalDirectory, newsDirectory, bmiDirectory];
+  const appDirectories = [reportDirectory, portalDirectory, newsDirectory];
   const userCount = appDirectories.reduce((total, item) => total + item.users.length, 0);
   const onlineCount = appDirectories.reduce(
     (total, item) => total + item.presence.filter(isOnlinePresence).length,
@@ -601,6 +767,7 @@ export default function DashboardPage({
           directory={directories?.[selectedApp.key] || { users: [], presence: [] }}
           addToast={addToast}
           onRefresh={onRefresh}
+          onBack={() => setSelectedApp(null)}
           currentUserEmail={user?.email}
         />
       )}

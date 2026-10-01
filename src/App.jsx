@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabaseClient";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage, { Icon } from "./pages/DashboardPage";
 import AllowedEmailsPage from "./pages/AllowedEmailsPage";
+import GuidePage from "./pages/GuidePage";
 import logo from "./image/idm.png";
 
 function Toast({ toasts, dismiss }) {
@@ -86,7 +87,6 @@ const sourceAliases = {
   report: new Set(["report", "ieces-report"]),
   portal: new Set(["portal", "ieces-portal"]),
   news: new Set(["news", "media", "news-manager", "ieces-media-manager"]),
-  bmi: new Set(["bmi", "deped-bmi"]),
 };
 
 const matchesSource = (registeredSource, source) =>
@@ -106,12 +106,7 @@ const normalizeProfile = (profile, source) => ({
       .join(" ") ||
     profile.username ||
     "Unnamed user",
-  role:
-    source === "bmi" && profile.role === "division"
-      ? "SDO Based"
-      : source === "bmi" && profile.role === "school"
-        ? "School Based"
-        : profile.role || "user",
+  role: profile.role || "user",
   source,
 });
 
@@ -119,6 +114,7 @@ const normalizeProfile = (profile, source) => ({
 const PAGES = {
   dashboard: "dashboard",
   allowedEmails: "allowedEmails",
+  guide: "guide",
 };
 
 function App() {
@@ -127,13 +123,13 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
   const [checking, setChecking] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [activePage, setActivePage] = useState(PAGES.dashboard);
   const [dashboardNavigationKey, setDashboardNavigationKey] = useState(0);
   const [directories, setDirectories] = useState({
     report: { users: [], presence: [] },
     portal: { users: [], presence: [] },
     news: { users: [], presence: [] },
-    bmi: { users: [], presence: [] },
   });
 
   const addToast = useCallback((message, type = "info", duration = 4000) => {
@@ -149,10 +145,9 @@ function App() {
   }, []);
 
   const loadDirectories = useCallback(async () => {
-    const [sharedProfiles, portalProfiles, bmiProfiles, presence, reportAllowed, newsAllowed] = await Promise.all([
+    const [sharedProfiles, portalProfiles, presence, reportAllowed, newsAllowed] = await Promise.all([
       supabase.from("profiles").select("*"),
       supabase.from("portal_profile").select("*"),
-      supabase.from("bmi_profiles").select("*"),
       supabase.from("user_presence").select("*"),
       supabase.from("report_allowed_users").select("email"),
       supabase.from("news_allowed_users").select("email"),
@@ -162,8 +157,6 @@ function App() {
       console.warn("Could not load IECES profiles:", sharedProfiles.error.message);
     if (portalProfiles.error)
       console.warn("Could not load Portal profiles:", portalProfiles.error.message);
-    if (bmiProfiles.error)
-      console.warn("Could not load BMI profiles:", bmiProfiles.error.message);
 
     const presenceRows = presence.error ? [] : (presence.data ?? []);
     const allowedSet = (result) => new Set(
@@ -198,12 +191,6 @@ function App() {
         users: profilesFor(sharedProfiles, allowedSet(newsAllowed), "news"),
         presence: presenceRows.filter((row) => row.app_id === "media"),
       },
-      bmi: {
-        users: (bmiProfiles.data ?? []).map((profile) =>
-          normalizeProfile(profile, "bmi"),
-        ),
-        presence: presenceRows.filter((row) => row.app_id === "bmi"),
-      },
     });
   }, []);
 
@@ -211,7 +198,17 @@ function App() {
     async (nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      if (nextSession) await loadDirectories();
+      if (nextSession) {
+        // Only the owner manages who may register a dashboard admin account.
+        const [owner] = await Promise.all([
+          supabase.rpc("is_dashboard_owner"),
+          loadDirectories(),
+        ]);
+        setIsOwner(owner.data === true);
+      } else {
+        setIsOwner(false);
+        setActivePage(PAGES.dashboard);
+      }
       setLoading(false);
     },
     [loadDirectories],
@@ -296,6 +293,8 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
+    setIsOwner(false);
+    setActivePage(PAGES.dashboard);
     addToast("Logged out successfully.", "success");
   };
 
@@ -350,12 +349,23 @@ function App() {
           >
             <Icon name="grid" /> Dashboard
           </button>
-          <p>Access Control</p>
+          {isOwner && (
+            <>
+              <p>Access Control</p>
+              <button
+                className={activePage === PAGES.allowedEmails ? "active" : ""}
+                onClick={() => setActivePage(PAGES.allowedEmails)}
+              >
+                <Icon name="users" /> Allowed Emails
+              </button>
+            </>
+          )}
+          <p>Help</p>
           <button
-            className={activePage === PAGES.allowedEmails ? "active" : ""}
-            onClick={() => setActivePage(PAGES.allowedEmails)}
+            className={activePage === PAGES.guide ? "active" : ""}
+            onClick={() => setActivePage(PAGES.guide)}
           >
-            <Icon name="users" /> Allowed Emails
+            <Icon name="book" /> User Guide
           </button>
           <p>Tools</p>
           <button
@@ -369,7 +379,10 @@ function App() {
         <div className="sidebar-user">
           <div className="avatar">{(user?.email || "A")[0].toUpperCase()}</div>
           <div>
-            <strong>{user?.user_metadata?.full_name || "Administrator"}</strong>
+            <strong>
+              {user?.user_metadata?.full_name ||
+                (isOwner ? "System owner" : "Administrator")}
+            </strong>
             <span>{user?.email} · IECES</span>
           </div>
           <button onClick={logout} aria-label="Log out" title="Log out">
@@ -387,7 +400,8 @@ function App() {
             addToast={addToast}
           />
         )}
-        {activePage === PAGES.allowedEmails && (
+        {activePage === PAGES.guide && <GuidePage isOwner={isOwner} />}
+        {isOwner && activePage === PAGES.allowedEmails && (
           <AllowedEmailsPage
             currentUserEmail={user?.email}
             addToast={addToast}

@@ -125,6 +125,7 @@ autoUpdater.on('error', (error) => {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    title: `IECES Admin Dashboard v${app.getVersion()}`,
     width: 1280,
     height: 820,
     minWidth: 1000,
@@ -135,6 +136,9 @@ function createWindow() {
       nodeIntegration: false,
     },
   })
+
+  // Keep the version in the title bar instead of the page <title>.
+  mainWindow.on("page-title-updated", (event) => event.preventDefault())
 
   const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
   if (process.env.VITE_DEV_SERVER_URL) {
