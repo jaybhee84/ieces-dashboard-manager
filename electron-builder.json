@@ -8,7 +8,7 @@
   "publish": [
     {
       "provider": "github",
-      "owner": "buzzjay84",
+      "owner": "jaybhee84",
       "repo": "ieces-dashboard-manager"
     }
   ],

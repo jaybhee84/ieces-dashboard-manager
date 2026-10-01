@@ -6,7 +6,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "electron:dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "electron:dev": "concurrently \"vite --port 5183 --strictPort\" \"wait-on http://localhost:5183 && cross-env VITE_DEV_SERVER_URL=http://localhost:5183 electron .\"",
     "build": "vite build",
     "electron:build": "vite build && electron-builder",
     "preview": "vite preview"
