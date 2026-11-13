@@ -145,6 +145,26 @@ Deno.serve(async (request: Request) => {
       return json(400, { error: "user_id is required." });
     }
 
+    // Only signed-in Dashboard Manager accounts may delete users.
+    const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+    const { data: caller } = token
+      ? await supabaseAdmin.auth.getUser(token)
+      : { data: { user: null } };
+    if (!caller.user) {
+      return json(401, { error: "Authentication required." });
+    }
+    const { data: manager } = await supabaseAdmin
+      .from("dashboard_profiles")
+      .select("id")
+      .eq("user_id", caller.user.id)
+      .maybeSingle();
+    if (!manager) {
+      return json(403, { error: "Dashboard Manager access is required." });
+    }
+    if (user_id === caller.user.id) {
+      return json(400, { error: "You cannot delete your own account." });
+    }
+
     const { data: targetDashboardProfile } = await supabaseAdmin
       .from("dashboard_profiles")
       .select("role")

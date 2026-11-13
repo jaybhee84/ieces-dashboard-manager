@@ -10,7 +10,12 @@ const emptyForm = {
   is_published: false,
 };
 
-const toLocalInput = (value) => value ? new Date(value).toISOString().slice(0, 16) : "";
+// datetime-local wants local time; toISOString() is UTC and shifted the expiry on every edit.
+const toLocalInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
 
 export default function BulletinManager({ addToast, currentUserEmail }) {
   const [announcements, setAnnouncements] = useState([]);

@@ -717,7 +717,10 @@ export default function DashboardPage({
                 tabIndex="0"
                 onClick={() => setSelectedApp(app)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setSelectedApp(app);
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedApp(app);
+                  }
                 }}
               >
                 <div className="app-card-top">

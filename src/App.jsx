@@ -218,9 +218,10 @@ function App() {
     supabase.auth.getSession().then(({ data }) => loadSession(data.session));
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) =>
-      loadSession(nextSession),
-    );
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      // Defer: awaiting Supabase calls inside this callback can deadlock the auth lock.
+      setTimeout(() => loadSession(nextSession), 0);
+    });
     return () => subscription.unsubscribe();
   }, [loadSession]);
 
